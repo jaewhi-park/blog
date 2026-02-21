@@ -1,4 +1,4 @@
-baseURL = "https://username.github.io/whi-blog/"
+baseURL = "https://jaewhi-park.github.io/blog/"
 languageCode = "ko"
 title = "whi-blog"
 theme = "hugo-book"
@@ -10,7 +10,7 @@ theme = "hugo-book"
   BookComments = true
 
 [params.giscus]
-  repo = "username/whi-blog"
+  repo = "jaewhi-park/blog"
   repoId = ""
   category = "Comments"
   categoryId = ""
