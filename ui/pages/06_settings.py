@@ -195,15 +195,125 @@ with tab_disclaimer:
         st.success("면책 조항 설정이 저장되었습니다.")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Tab 3: LLM 설정 (M3에서 활성화)
+# Tab 3: LLM 설정
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with tab_llm:
-    st.info("M3에서 LLM 연동 후 활성화됩니다.")
+    llm_config_path = CONFIG_DIR / "llm_config.yaml"
+    llm_cfg = _load_yaml(llm_config_path)
+    providers_cfg = llm_cfg.get("providers", {})
+    chunking_cfg = llm_cfg.get("chunking", {})
 
-    st.selectbox("기본 프로바이더", ["Claude", "OpenAI", "Llama"], disabled=True)
-    st.selectbox("기본 모델", ["Sonnet", "Haiku", "Opus"], disabled=True)
+    # 프로바이더/모델 목록 구성
+    _PROVIDER_DISPLAY = {"claude": "Claude", "openai": "OpenAI", "llama": "Llama"}
+    provider_keys = list(providers_cfg.keys())
+    provider_labels = [_PROVIDER_DISPLAY.get(k, k) for k in provider_keys]
+
+    all_models: list[str] = []
+    for pcfg in providers_cfg.values():
+        for m in pcfg.get("models", []):
+            all_models.append(m["id"])
+
+    # ── 기본 프로바이더/모델 ──────────────────────────────────
+    st.markdown("### 기본 프로바이더 / 모델")
+
+    if not provider_keys:
+        st.warning("llm_config.yaml에 프로바이더가 설정되어 있지 않습니다.")
+    else:
+        col_prov, col_model = st.columns(2)
+        with col_prov:
+            default_provider_idx = 0
+            selected_provider_label = st.selectbox(
+                "기본 프로바이더",
+                provider_labels,
+                index=default_provider_idx,
+                key="llm_default_provider",
+            )
+            selected_provider_key = provider_keys[
+                provider_labels.index(selected_provider_label)
+            ]
+
+        with col_model:
+            prov_cfg = providers_cfg.get(selected_provider_key, {})
+            prov_models = [m["id"] for m in prov_cfg.get("models", [])]
+            current_default = prov_cfg.get("default_model", "")
+            default_model_idx = (
+                prov_models.index(current_default)
+                if current_default in prov_models
+                else 0
+            )
+            selected_model = st.selectbox(
+                "기본 모델",
+                prov_models,
+                index=default_model_idx,
+                key="llm_default_model",
+            )
 
     st.divider()
-    st.markdown("#### Map-Reduce 모델 설정")
-    st.selectbox("Map 모델 (경량)", ["Haiku", "GPT-4o-mini"], disabled=True)
-    st.selectbox("Reduce 모델 (고성능)", ["Sonnet", "GPT-4o"], disabled=True)
+
+    # ── Map-Reduce 모델 설정 ─────────────────────────────────
+    st.markdown("### Map-Reduce 모델 설정")
+
+    col_map, col_reduce = st.columns(2)
+    with col_map:
+        current_map = chunking_cfg.get("map_model", "")
+        map_idx = all_models.index(current_map) if current_map in all_models else 0
+        map_model = st.selectbox(
+            "Map 모델 (경량)",
+            all_models,
+            index=map_idx,
+            key="llm_map_model",
+        )
+    with col_reduce:
+        current_reduce = chunking_cfg.get("reduce_model", "")
+        reduce_idx = (
+            all_models.index(current_reduce) if current_reduce in all_models else 0
+        )
+        reduce_model = st.selectbox(
+            "Reduce 모델 (고성능)",
+            all_models,
+            index=reduce_idx,
+            key="llm_reduce_model",
+        )
+
+    st.divider()
+
+    # ── 청킹 파라미터 ────────────────────────────────────────
+    st.markdown("### 청킹 파라미터")
+
+    col_chunk, col_thresh = st.columns(2)
+    with col_chunk:
+        chunk_size = st.number_input(
+            "청크 크기 (토큰)",
+            min_value=500,
+            max_value=32000,
+            value=chunking_cfg.get("chunk_size_tokens", 4000),
+            step=500,
+            key="llm_chunk_size",
+        )
+    with col_thresh:
+        threshold = st.slider(
+            "컨텍스트 임계치",
+            min_value=0.3,
+            max_value=0.95,
+            value=chunking_cfg.get("context_threshold", 0.7),
+            step=0.05,
+            key="llm_threshold",
+            help="컨텍스트 윈도우의 이 비율을 초과하면 Map-Reduce를 사용합니다.",
+        )
+
+    st.divider()
+
+    # ── 저장 ─────────────────────────────────────────────────
+    if st.button("LLM 설정 저장", type="primary"):
+        if provider_keys:
+            providers_cfg[selected_provider_key]["default_model"] = selected_model
+
+        llm_cfg["providers"] = providers_cfg
+        llm_cfg["chunking"] = {
+            "chunk_size_tokens": chunk_size,
+            "context_threshold": threshold,
+            "map_model": map_model,
+            "reduce_model": reduce_model,
+        }
+        _save_yaml(llm_config_path, llm_cfg)
+        st.success("LLM 설정이 저장되었습니다.")
