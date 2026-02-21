@@ -22,6 +22,7 @@ from core.llm.factory import LLMFactory  # noqa: E402
 from ui.components.editor import image_upload_insert, markdown_editor  # noqa: E402
 from ui.components.llm_selector import llm_selector  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
+from ui.components.source_input import source_input  # noqa: E402
 
 st.set_page_config(page_title="글 작성 | whi-blog", layout="wide")
 
@@ -305,7 +306,11 @@ elif mode == "페어 라이팅":
 
 # ── 자동 생성 모드 ──────────────────────────────────────────
 elif mode == "자동 생성":
-    st.caption("소스 입력은 M4에서 추가됩니다.")
+    # 소스 입력
+    with st.expander("소스 자료 (PDF, URL, arXiv)", expanded=False):
+        auto_sources = source_input(key_prefix="auto_source")
+        if auto_sources:
+            st.caption(f"{len(auto_sources)}개 소스 등록됨")
 
     prompt = st.text_area(
         "주제 / 지시사항",
@@ -319,7 +324,35 @@ elif mode == "자동 생성":
     if st.button("생성 요청", type="primary", disabled=not prompt.strip()):
         import asyncio
 
+        from core.exceptions import SourceError  # noqa: E402
+        from core.sources.aggregator import SourceAggregator  # noqa: E402
+        from core.sources.arxiv_client import ArxivClient  # noqa: E402
+        from core.sources.pdf_parser import PDFParser  # noqa: E402
+        from core.sources.url_crawler import URLCrawler  # noqa: E402
+
         try:
+            # 소스 자료 수집
+            source_text = ""
+            if auto_sources:
+                aggregator = SourceAggregator(
+                    PDFParser(),
+                    URLCrawler(),
+                    ArxivClient(),
+                )
+                with st.spinner("소스 자료 수집 중..."):
+                    aggregated = asyncio.run(aggregator.aggregate(auto_sources))
+                source_text = aggregated.combined_text
+                st.session_state["auto_source_images"] = aggregated.images
+                st.session_state["auto_source_image_data"] = aggregated.image_data
+
+            user_prompt = prompt
+            if source_text:
+                user_prompt = (
+                    f"다음 소스 자료를 참고하여 글을 작성하세요:\n\n"
+                    f"{source_text}\n\n---\n\n"
+                    f"지시사항: {prompt}"
+                )
+
             client = LLMFactory.create(provider)
             request = LLMRequest(
                 system_prompt=(
@@ -329,7 +362,7 @@ elif mode == "자동 생성":
                     "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
                     "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
                 ),
-                user_prompt=prompt,
+                user_prompt=user_prompt,
                 model=model,
             )
             with st.spinner("글 생성 중..."):
@@ -342,6 +375,8 @@ elif mode == "자동 생성":
                 f"토큰: {response.usage.get('input_tokens', 0)} in / "
                 f"{response.usage.get('output_tokens', 0)} out"
             )
+        except SourceError as e:
+            st.error(f"소스 수집 실패: {e}")
         except (ConfigError, LLMError) as e:
             st.error(f"LLM 호출 실패: {e}")
 
