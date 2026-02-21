@@ -14,14 +14,17 @@ import streamlit as st  # noqa: E402
 
 from core.content.category_manager import CategoryManager  # noqa: E402
 from core.content.markdown_generator import MarkdownGenerator, PostMetadata, _slugify  # noqa: E402
+from core.publishing.git_manager import GitError, GitManager  # noqa: E402
 from ui.components.editor import image_upload_insert, markdown_editor  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
 
 st.set_page_config(page_title="글 작성 | whi-blog", layout="wide")
 
 # ── 경로 설정 ──────────────────────────────────────────────
+PROJECT_ROOT = Path(_PROJECT_ROOT)
 HUGO_CONTENT = Path("hugo-site/content")
 HUGO_STATIC = Path("hugo-site/static")
+git_mgr = GitManager(PROJECT_ROOT)
 
 # ── 카테고리 목록 로드 ──────────────────────────────────────
 cat_mgr = CategoryManager(HUGO_CONTENT)
@@ -130,7 +133,19 @@ if mode == "직접 작성":
 
             gen = MarkdownGenerator()
             file_path = gen.save(meta, content, HUGO_CONTENT, selected_category_path)
-            st.success(f"게시 완료: `{file_path.relative_to(HUGO_CONTENT)}`")
+            rel_path = file_path.relative_to(PROJECT_ROOT)
+            st.success(f"파일 저장됨: `{rel_path}`")
+
+            # Git commit + push
+            try:
+                sha = git_mgr.commit_and_push(
+                    f"post: {title}",
+                    [file_path],
+                    push=True,
+                )
+                st.success(f"Git push 완료 (commit: `{sha}`)")
+            except GitError as e:
+                st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
 
     # 미리보기 다이얼로그
     @st.dialog("미리보기", width="large")
