@@ -85,80 +85,90 @@
 
 ### M2.1 Streamlit 앱 기본 구조
 
-- [ ] `ui/app.py` — 메인 앱, 사이드바 네비게이션
-- [ ] 멀티 페이지 구조 설정 (pages/ 디렉토리)
-- [ ] 공통 레이아웃/스타일 설정
+- [x] `ui/app.py` — 메인 앱, 사이드바 네비게이션
+- [x] 멀티 페이지 구조 설정 (pages/ 디렉토리)
+- [x] 공통 레이아웃/스타일 설정
 
 ### M2.2 코어 모듈 — 마크다운 생성기
 
-- [ ] `core/content/markdown_generator.py` 구현
-  - [ ] `PostMetadata` dataclass 정의
-  - [ ] `generate()` — front matter + content 마크다운 문자열 생성
-  - [ ] `save()` — Hugo content 디렉토리에 파일 저장
-  - [ ] front matter에 llm_disclaimer, llm_generated, llm_assisted 플래그 포함
-- [ ] 단위 테스트 (`tests/unit/test_markdown_generator.py`)
+- [x] `core/content/markdown_generator.py` 구현
+  - [x] `PostMetadata` dataclass 정의
+  - [x] `generate()` — front matter + content 마크다운 문자열 생성
+  - [x] `save()` — Hugo content 디렉토리에 파일 저장
+  - [x] front matter에 llm_disclaimer, llm_generated, llm_assisted 플래그 포함
+- [x] 단위 테스트 (`tests/unit/test_markdown_generator.py`) — 16개 통과
 
 ### M2.3 코어 모듈 — 카테고리 매니저
 
-- [ ] `core/content/category_manager.py` 구현
-  - [ ] `list_all()` — 현재 카테고리 트리 반환
-  - [ ] `add()` — 카테고리 디렉토리 + _index.md 생성
-  - [ ] `remove()` — 카테고리 삭제 (하위 게시글 없는 경우만)
-  - [ ] `move()` — 카테고리 이동
-- [ ] 단위 테스트 (`tests/unit/test_category_manager.py`)
+- [x] `core/content/category_manager.py` 구현
+  - [x] `list_all()` — 현재 카테고리 트리 반환
+  - [x] `add()` — 카테고리 디렉토리 + _index.md 생성
+  - [x] `remove()` — 카테고리 삭제 (하위 게시글 없는 경우만)
+  - [x] `move()` — 카테고리 이동
+- [x] 단위 테스트 (`tests/unit/test_category_manager.py`) — 18개 통과
 
 ### M2.4 코어 모듈 — 이미지 매니저
 
-- [ ] `core/content/image_manager.py` 구현
-  - [ ] `save_image()` — Hugo static에 이미지 저장, 마크다운 참조 경로 반환
-  - [ ] `generate_markdown_ref()` — 마크다운 이미지 참조 생성
-- [ ] 단위 테스트
+- [x] `core/content/image_manager.py` 구현
+  - [x] `save_image()` — Hugo static에 이미지 저장, 마크다운 참조 경로 반환
+  - [x] `generate_markdown_ref()` — 마크다운 이미지 참조 생성
+  - [x] `list_images()` — 게시글별 이미지 목록 조회
+  - [x] `delete_image()` — 이미지 삭제 (빈 디렉토리 자동 정리)
+- [x] 단위 테스트 (`tests/unit/test_image_manager.py`) — 18개 통과
 
 ### M2.5 글 작성 페이지 — 직접 작성 모드
 
-- [ ] `ui/pages/01_write.py` — 글 작성 모드 선택 UI
-- [ ] `ui/components/editor.py` — 마크다운 에디터 컴포넌트
-- [ ] `ui/components/preview.py` — 실시간 미리보기 컴포넌트 (수식 렌더링)
-- [ ] 카테고리 선택 드롭다운 (카테고리 매니저 연동)
-- [ ] 태그 입력
-- [ ] 이미지 업로드 → 마크다운 자동 삽입
-- [ ] 면책 조항 자동 설정 로직 (모드에 따라 플래그 세팅)
+- [x] `ui/pages/01_write.py` — 글 작성 모드 선택 UI (직접/페어/자동)
+- [x] `ui/components/editor.py` — 마크다운 에디터 + 이미지 업로드 컴포넌트
+- [x] `ui/components/preview.py` — KaTeX 수식 렌더링 미리보기 (다이얼로그 팝업)
+- [x] 카테고리 선택 드롭다운 (CategoryManager 연동, 트리 플랫 변환)
+- [x] 태그 입력
+- [x] 이미지 업로드 → ImageManager 저장 → 마크다운 참조 자동 생성
+- [x] 면책 조항 자동 설정 로직 (모드에 따라 llm_assisted/llm_generated 플래그 세팅)
+- [x] sys.path 설정으로 core 패키지 import 해결
 
 ### M2.6 카테고리 관리 페이지
 
-- [ ] `ui/pages/02_categories.py`
-  - [ ] 카테고리 트리 표시
-  - [ ] 카테고리 추가 (이름, 부모 선택)
-  - [ ] 카테고리 삭제
-  - [ ] 카테고리 이동
+- [x] `ui/pages/02_categories.py`
+  - [x] 카테고리 트리 표시 (들여쓰기 + 경로)
+  - [x] 카테고리 추가 (이름, 부모 선택)
+  - [x] 카테고리 삭제 (게시글 존재 시 안전 차단)
+  - [x] 카테고리 이동 (출발지/목적지 선택)
 
 ### M2.7 설정 페이지 — 관심사 관리
 
-- [ ] `ui/pages/06_settings.py` — 기본 구조
-- [ ] arxiv 관심사 관리 UI
-  - [ ] 관심 카테고리 추가/제거 (예: math.PR)
-  - [ ] 관심 키워드 추가/제거
-  - [ ] 관심사 자연어 설명 편집
-  - [ ] YAML 파일 저장/로드 (`config/arxiv_digest.yaml`)
-- [ ] 면책 조항 설정 UI
-  - [ ] 문구 편집
-  - [ ] 스타일 선택 (warning/info/note)
-  - [ ] 활성화/비활성화 토글
-  - [ ] YAML 파일 저장/로드 (`config/disclaimer.yaml`)
+- [x] `ui/pages/06_settings.py` — 탭 기반 설정 페이지
+- [x] arxiv 관심사 관리 UI
+  - [x] 관심 카테고리 추가/제거 (예: math.PR)
+  - [x] 관심 키워드 추가/제거
+  - [x] 관심사 자연어 설명 편집
+  - [x] YAML 파일 저장/로드 (`config/arxiv_digest.yaml`)
+- [x] 면책 조항 설정 UI
+  - [x] 문구 편집
+  - [x] 스타일 선택 (warning/info/note)
+  - [x] YAML 파일 저장/로드 (`config/disclaimer.yaml` + Hugo data 동기화)
+- [x] LLM 설정 탭 스텁 (M3에서 활성화)
 
 ### M2.8 Git 연동
 
-- [ ] `core/publishing/git_manager.py` 구현
-  - [ ] `commit_and_push()` — 파일 추가, 커밋, push
-- [ ] Streamlit에서 [게시하기] 버튼 → git commit + push 실행
-- [ ] 게시 결과 피드백 표시 (성공/실패)
+- [x] `core/publishing/git_manager.py` 구현
+  - [x] `commit_and_push()` — 파일 추가, 커밋, push
+  - [x] `create_branch()` — 새 브랜치 생성
+  - [x] `create_pr()` — gh CLI로 PR 생성
+  - [x] `has_changes()` — 변경사항 확인
+- [x] 단위 테스트 (`tests/unit/test_git_manager.py`) — 7개 통과
+- [x] Streamlit에서 [게시하기] 버튼 → git commit + push 실행
+- [x] 게시 결과 피드백 표시 (성공/실패)
 
 ### M2.9 Hugo 로컬 미리보기
 
-- [ ] `core/publishing/hugo_builder.py` 구현
-  - [ ] `serve()` — hugo server -D 실행
-  - [ ] `get_preview_url()` — 게시글 미리보기 URL 반환
-- [ ] Streamlit에서 [미리보기 (Hugo)] 버튼 → 새 탭에서 Hugo 로컬 서버 열기
+- [x] `core/publishing/hugo_builder.py` 구현
+  - [x] `build()` — hugo --minify 실행
+  - [x] `serve()` — hugo server -D 실행 (프로세스 재사용)
+  - [x] `stop()` — 서버 종료
+  - [x] `get_preview_url()` — 게시글 미리보기 URL 반환
+- [x] 단위 테스트 (`tests/unit/test_hugo_builder.py`) — 6개 통과
+- [x] Streamlit에서 [미리보기 (Hugo)] 버튼 → draft 저장 후 Hugo 서버 URL 표시
 
 ---
 
