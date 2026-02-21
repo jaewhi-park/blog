@@ -5,6 +5,7 @@ theme = "hugo-book"
 
 [params]
   BookTheme = "auto"
+  BookSection = "*"
   BookToC = true
   BookComments = true
 
