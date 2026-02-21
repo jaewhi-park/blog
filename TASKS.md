@@ -179,71 +179,104 @@
 
 ### M3.1 설정 관리
 
-- [ ] `core/config.py` 구현
-  - [ ] YAML 로더
-  - [ ] `get_api_key()` — 환경변수 → .env fallback → 에러
-- [ ] `config/llm_config.yaml` 작성 (프로바이더, 모델, 청킹 설정)
+- [x] `core/config.py` 구현
+  - [x] YAML 로더 (`_load_yaml()`)
+  - [x] `get_api_key()` — 환경변수 → .env fallback → ConfigError
+  - [x] `get_provider_config()` — 프로바이더별 설정 반환
+  - [x] `get_chunking_config()` — 청킹 설정 반환
+  - [x] (리뷰) config_dir 기본값을 절대경로로 수정
+  - [x] (리뷰) load_dotenv()를 모듈 레벨로 이동 (인스턴스당 중복 호출 방지)
+  - [x] (리뷰) YAML 파싱 에러 핸들링 추가 (yaml.YAMLError → ConfigError)
+  - [x] (리뷰) 빈 문자열/공백만 있는 API 키 검증 추가
+- [x] `config/llm_config.yaml` 작성 (claude/openai/llama 프로바이더, 모델, 청킹 설정)
+- [x] 단위 테스트 (`tests/unit/test_config.py`) — 12개 통과
 
 ### M3.2 LLM 클라이언트 — 인터페이스
 
-- [ ] `core/llm/base.py` 구현
-  - [ ] `LLMRequest` dataclass
-  - [ ] `LLMResponse` dataclass
-  - [ ] `LLMClient` Protocol (generate, generate_stream, count_tokens)
+- [x] `core/llm/base.py` 구현
+  - [x] `LLMRequest` dataclass (system_prompt, user_prompt, model, temperature, max_tokens)
+  - [x] `LLMResponse` dataclass (content, model, usage)
+  - [x] `LLMClient` Protocol (generate, generate_stream, count_tokens, provider_name, max_context_tokens, available_models)
+  - [x] (리뷰) `@runtime_checkable` 추가, 팩토리 테스트에 isinstance 검증 추가
+- [x] 단위 테스트 (`tests/unit/test_llm_base.py`) — 4개 통과
 
 ### M3.3 LLM 클라이언트 — Claude
 
-- [ ] `core/llm/claude_client.py` 구현
-  - [ ] `generate()` — anthropic SDK 비동기 호출
-  - [ ] `generate_stream()` — 스트리밍 응답
-  - [ ] `count_tokens()` — anthropic 토큰 카운팅
-  - [ ] `available_models` — config에서 모델 목록 로드
-- [ ] 통합 테스트 (`tests/integration/test_llm_clients.py`)
+- [x] `core/llm/claude_client.py` 구현
+  - [x] `generate()` — anthropic AsyncAnthropic 비동기 호출
+  - [x] `generate_stream()` — 스트리밍 응답 (messages.stream)
+  - [x] `count_tokens()` — anthropic 토큰 카운팅
+  - [x] `available_models` — config에서 모델 목록 로드
+  - [x] 에러 핸들링 (AuthenticationError → LLMAuthError, RateLimitError → LLMRateLimitError)
+  - [x] (리뷰) tenacity 재시도 데코레이터 적용 (exponential backoff, 최대 3회)
+  - [x] (리뷰) 빈 응답 가드 추가 (response.content 체크)
+- [x] 단위 테스트 (`tests/unit/test_llm_clients.py`) — 8개 통과 (rate limit 재시도, API 에러, 빈 응답 추가)
+- [ ] 통합 테스트 (`tests/integration/test_llm_clients.py`) *(API 키 필요)*
 
 ### M3.4 LLM 클라이언트 — OpenAI
 
-- [ ] `core/llm/openai_client.py` 구현
-  - [ ] `generate()` — openai SDK 비동기 호출
-  - [ ] `generate_stream()` — 스트리밍 응답
-  - [ ] `count_tokens()` — tiktoken 사용
-  - [ ] `available_models` — config에서 모델 목록 로드
-- [ ] 통합 테스트
+- [x] `core/llm/openai_client.py` 구현
+  - [x] `generate()` — openai AsyncOpenAI 비동기 호출
+  - [x] `generate_stream()` — 스트리밍 응답
+  - [x] `count_tokens()` — tiktoken 사용
+  - [x] `available_models` — config에서 모델 목록 로드
+  - [x] (리뷰) tenacity 재시도 데코레이터 적용
+  - [x] (리뷰) 빈 응답 가드 추가 (response.choices 체크)
+- [x] 단위 테스트 — 5개 통과 (rate limit 재시도, 빈 choices 추가)
+- [ ] 통합 테스트 *(API 키 필요)*
 
 ### M3.5 LLM 클라이언트 — Llama
 
-- [ ] `core/llm/llama_client.py` 구현
-  - [ ] `generate()` — ollama REST API 호출
-  - [ ] `count_tokens()` — 근사치 (len // 4)
-  - [ ] `available_models` — config에서 모델 목록 로드
-- [ ] 통합 테스트
+- [x] `core/llm/llama_client.py` 구현
+  - [x] `generate()` — ollama REST API (httpx AsyncClient)
+  - [x] `generate_stream()` — Ollama 스트리밍 응답
+  - [x] `count_tokens()` — 근사치 (len // 4)
+  - [x] `available_models` — config에서 모델 목록 로드
+  - [x] (리뷰) AsyncClient를 인스턴스 속성으로 재사용 (요청마다 재생성 방지)
+  - [x] (리뷰) json import을 모듈 레벨로 이동
+  - [x] (리뷰) 빈 응답 가드 추가 (.get() 체이닝)
+- [x] 단위 테스트 — 6개 통과 (빈 응답, HTTP 에러 추가)
+- [ ] 통합 테스트 *(Ollama 서버 필요)*
 
 ### M3.6 LLM 팩토리
 
-- [ ] `core/llm/factory.py` 구현
-  - [ ] `create()` — provider 문자열로 클라이언트 인스턴스 생성
+- [x] `core/llm/factory.py` 구현
+  - [x] `create()` — match-based provider dispatch (claude/openai/llama)
+- [x] 단위 테스트 (`tests/unit/test_llm_factory.py`) — 4개 통과
 
 ### M3.7 에러 처리
 
-- [ ] `core/exceptions.py` 구현
-  - [ ] `WhiBlogError`, `ConfigError`, `LLMError`, `LLMRateLimitError` 등
-- [ ] LLM 호출에 재시도 로직 적용 (tenacity)
+- [x] `core/exceptions.py` 구현
+  - [x] `WhiBlogError`, `ConfigError`, `LLMError`, `LLMRateLimitError`, `LLMAuthError`, `LLMContextOverflowError`, `SourceError`, `PublishError`
+  - [x] (리뷰) `GitError(PublishError)`, `HugoError(PublishError)` 추가 — 중앙 예외 계층 통합
+- [x] LLM 호출에 재시도 로직 적용 (tenacity) — ClaudeClient, OpenAIClient에 적용 완료
 
 ### M3.8 Streamlit — 페어 라이팅 모드
 
-- [ ] `ui/components/llm_selector.py` — 프로바이더/모델 선택 컴포넌트
-- [ ] 글 작성 페이지에 페어 라이팅 모드 UI 추가
-  - [ ] 초안 입력 → 프로바이더/모델 선택 → [LLM 피드백 요청]
-  - [ ] LLM 피드백 표시 영역
-  - [ ] 피드백 반영 후 편집 → [게시하기]
-  - [ ] 면책 조항 플래그 자동 설정 (llm_assisted = true)
+- [x] `ui/components/llm_selector.py` — 프로바이더/모델 선택 컴포넌트
+  - [x] (리뷰) config/llm_config.yaml에서 모델 목록 로드, 실패 시 fallback
+- [x] 글 작성 페이지에 페어 라이팅 모드 UI 추가
+  - [x] 초안 입력 → 프로바이더/모델 선택 → [LLM 피드백 요청]
+  - [x] LLM 피드백 표시 영역 (모델, 토큰 정보 포함)
+  - [x] 미리보기 (다이얼로그 팝업)
+  - [x] 면책 조항 플래그 자동 설정 (llm_assisted = true)
+  - [x] (리뷰) [게시하기] 버튼 추가 (llm_assisted=True PostMetadata)
+  - [x] (리뷰) 이미지 업로드 expander 추가
+  - [x] (리뷰) [미리보기 (Hugo)] 버튼 추가
+  - [x] (리뷰) `_slugify` → `slugify` public 함수로 변경
+  - [x] (리뷰) GitError/HugoError import을 core.exceptions로 통일
 
 ### M3.9 Streamlit — 자동 생성 모드 (기본)
 
-- [ ] 글 작성 페이지에 자동 생성 모드 UI 추가
-  - [ ] 텍스트 입력(간단한 주제/지시) → 프로바이더/모델 선택 → [생성 요청]
-  - [ ] 초안 표시 → 편집 → [게시하기]
-  - [ ] 면책 조항 플래그 자동 설정 (llm_generated = true)
-  - [ ] (소스 입력은 M4에서 추가)
+- [x] 글 작성 페이지에 자동 생성 모드 UI 추가
+  - [x] 텍스트 입력(주제/지시) → 프로바이더/모델 선택 → [생성 요청]
+  - [x] 생성된 초안 편집 가능 (session_state 관리)
+  - [x] 미리보기 + [게시하기] (llm_generated + llm_model 메타데이터 포함)
+  - [x] 면책 조항 플래그 자동 설정 (llm_generated = true)
+  - [x] (소스 입력은 M4에서 추가)
+  - [x] (리뷰) [미리보기 (Hugo)] 버튼 추가
+  - [x] (리뷰) 이미지 업로드 expander 추가
+  - [x] (리뷰) 게시 완료 후 session_state 정리
 
 ---
 
