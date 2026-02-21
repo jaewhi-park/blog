@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.exceptions import LLMAuthError
+from core.exceptions import LLMAuthError, LLMError, LLMRateLimitError
 from core.llm.base import LLMRequest, LLMResponse
 from core.llm.claude_client import ClaudeClient
 from core.llm.llama_client import LlamaClient
@@ -95,6 +95,50 @@ class TestClaudeClient:
             )
         )
         with pytest.raises(LLMAuthError):
+            await client.generate(llm_request)
+
+    @pytest.mark.asyncio()
+    async def test_generate_rate_limit_error(self, llm_request: LLMRequest) -> None:
+        import anthropic
+
+        client = ClaudeClient(api_key="test", config=CLAUDE_CONFIG)
+        client._client.messages.create = AsyncMock(
+            side_effect=anthropic.RateLimitError(
+                message="rate limited",
+                response=MagicMock(status_code=429),
+                body=None,
+            )
+        )
+        # tenacity가 3회 재시도 후 LLMRateLimitError를 다시 던짐
+        with pytest.raises(LLMRateLimitError):
+            await client.generate(llm_request)
+        assert client._client.messages.create.call_count == 3
+
+    @pytest.mark.asyncio()
+    async def test_generate_api_error(self, llm_request: LLMRequest) -> None:
+        import anthropic
+
+        client = ClaudeClient(api_key="test", config=CLAUDE_CONFIG)
+        client._client.messages.create = AsyncMock(
+            side_effect=anthropic.APIError(
+                message="server error",
+                request=MagicMock(),
+                body=None,
+            )
+        )
+        with pytest.raises(LLMError):
+            await client.generate(llm_request)
+
+    @pytest.mark.asyncio()
+    async def test_generate_empty_response(self, llm_request: LLMRequest) -> None:
+        client = ClaudeClient(api_key="test", config=CLAUDE_CONFIG)
+
+        mock_response = MagicMock()
+        mock_response.content = []
+
+        client._client.messages.create = AsyncMock(return_value=mock_response)
+
+        with pytest.raises(LLMError, match="빈 응답"):
             await client.generate(llm_request)
 
 

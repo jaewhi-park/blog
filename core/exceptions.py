@@ -21,6 +21,10 @@ class LLMAuthError(LLMError):
     """LLM API 인증 실패."""
 
 
+class LLMContextOverflowError(LLMError):
+    """Map-Reduce 후에도 컨텍스트 초과."""
+
+
 class SourceError(WhiBlogError):
     """소스 파싱/크롤링 에러."""
 
