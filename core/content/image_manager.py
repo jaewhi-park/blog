@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 @dataclass
@@ -16,15 +18,43 @@ class ImageInfo:
     caption: str | None = None
 
 
+def get_base_path(hugo_dir: Path) -> str:
+    """hugo.toml의 baseURL에서 경로 부분을 추출한다.
+
+    예: baseURL = "https://example.github.io/blog/" → "/blog"
+
+    Args:
+        hugo_dir: Hugo 프로젝트 디렉토리 (hugo.toml이 있는 곳).
+
+    Returns:
+        경로 문자열 (trailing slash 없음). 루트이면 빈 문자열.
+    """
+    toml_path = hugo_dir / "hugo.toml"
+    if not toml_path.exists():
+        return ""
+
+    with open(toml_path, "rb") as f:
+        config = tomllib.load(f)
+
+    base_url = config.get("baseURL", "")
+    if not base_url:
+        return ""
+
+    path = urlparse(base_url).path.rstrip("/")
+    return path
+
+
 class ImageManager:
     """Hugo static 디렉토리에 이미지를 저장하고 마크다운 참조를 생성한다."""
 
-    def __init__(self, hugo_static_path: Path) -> None:
+    def __init__(self, hugo_static_path: Path, *, base_path: str = "") -> None:
         """
         Args:
             hugo_static_path: Hugo static 디렉토리 경로 (예: hugo-site/static).
+            base_path: baseURL 경로 (예: "/blog"). 이미지 참조에 접두사로 사용.
         """
         self._static_path = hugo_static_path
+        self._base_path = base_path
 
     def save_image(
         self,
@@ -80,7 +110,7 @@ class ImageManager:
             ![caption](/images/post-slug/filename) 형태의 문자열.
         """
         alt_text = image_info.caption or image_info.filename
-        path = f"/images/{post_slug}/{image_info.filename}"
+        path = f"{self._base_path}/images/{post_slug}/{image_info.filename}"
         return f"![{alt_text}]({path})"
 
     def list_images(self, post_slug: str) -> list[ImageInfo]:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from core.content.image_manager import ImageInfo, ImageManager
+from core.content.image_manager import ImageInfo, ImageManager, get_base_path
 
 
 class TestSaveImage:
@@ -64,6 +64,13 @@ class TestGenerateMarkdownRef:
         ref = mgr.generate_markdown_ref("my-post", info)
         assert ref == "![diagram.png](/images/my-post/diagram.png)"
 
+    def test_ref_with_base_path(self, tmp_path: Path) -> None:
+        mgr = ImageManager(tmp_path, base_path="/blog")
+        info = ImageInfo(filename="diagram.png", source="upload")
+
+        ref = mgr.generate_markdown_ref("my-post", info)
+        assert ref == "![diagram.png](/blog/images/my-post/diagram.png)"
+
     def test_ref_with_caption(self, tmp_path: Path) -> None:
         mgr = ImageManager(tmp_path)
         info = ImageInfo(
@@ -79,6 +86,27 @@ class TestGenerateMarkdownRef:
 
         ref = mgr.generate_markdown_ref("my-post", info)
         assert "![chart.svg]" in ref
+
+
+class TestGetBasePath:
+    def test_extracts_subpath(self, tmp_path: Path) -> None:
+        (tmp_path / "hugo.toml").write_text(
+            'baseURL = "https://example.github.io/blog/"', encoding="utf-8"
+        )
+        assert get_base_path(tmp_path) == "/blog"
+
+    def test_root_url(self, tmp_path: Path) -> None:
+        (tmp_path / "hugo.toml").write_text(
+            'baseURL = "https://example.com/"', encoding="utf-8"
+        )
+        assert get_base_path(tmp_path) == ""
+
+    def test_missing_toml(self, tmp_path: Path) -> None:
+        assert get_base_path(tmp_path) == ""
+
+    def test_no_base_url(self, tmp_path: Path) -> None:
+        (tmp_path / "hugo.toml").write_text('title = "My Blog"', encoding="utf-8")
+        assert get_base_path(tmp_path) == ""
 
 
 class TestListImages:

@@ -60,10 +60,11 @@ def image_upload_insert(*, post_slug: str, key: str = "img_upload") -> str | Non
 
     from pathlib import Path
 
-    from core.content.image_manager import ImageManager
+    from core.content.image_manager import ImageManager, get_base_path
 
-    hugo_static = Path("hugo-site/static")
-    mgr = ImageManager(hugo_static)
+    hugo_dir = Path("hugo-site")
+    base_path = get_base_path(hugo_dir)
+    mgr = ImageManager(hugo_dir / "static", base_path=base_path)
 
     image_data = uploaded.getvalue()
     info = mgr.save_image(image_data, post_slug, uploaded.name)

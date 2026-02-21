@@ -170,6 +170,24 @@
 - [x] 단위 테스트 (`tests/unit/test_hugo_builder.py`) — 6개 통과
 - [x] Streamlit에서 [미리보기 (Hugo)] 버튼 → draft 저장 후 Hugo 서버 URL 표시
 
+### M2.10 글 관리 페이지
+
+- [x] `core/content/post_manager.py` 구현
+  - [x] `PostInfo` dataclass (file_path, title, date, categories, tags, draft)
+  - [x] `PostManager.list_posts()` — .md 스캔, _index.md 제외, date 역순 정렬
+  - [x] `PostManager.load_post()` — front matter 파싱 + 본문 분리 + disclaimer 제거
+  - [x] `PostManager.save_post()` — MarkdownGenerator.generate()로 덮어쓰기
+  - [x] `PostManager.delete_post()` — 파일 삭제
+- [x] 단위 테스트 (`tests/unit/test_post_manager.py`) — 9개 통과
+- [x] `ui/pages/07_manage.py` — 글 관리 페이지
+  - [x] 카테고리 필터 + 초안만 보기 필터
+  - [x] 글 선택 selectbox (제목, 날짜, draft 표시)
+  - [x] 메타데이터 편집 (제목, 태그, 카테고리, 초안, 수식)
+  - [x] 마크다운 에디터 (기존 본문 로드)
+  - [x] 미리보기 다이얼로그
+  - [x] 저장 → git commit + push
+  - [x] 삭제 → 확인 다이얼로그 → git commit + push
+
 ---
 
 ## M3: LLM 연동
@@ -189,6 +207,8 @@
   - [x] (리뷰) YAML 파싱 에러 핸들링 추가 (yaml.YAMLError → ConfigError)
   - [x] (리뷰) 빈 문자열/공백만 있는 API 키 검증 추가
 - [x] `config/llm_config.yaml` 작성 (claude/openai/llama 프로바이더, 모델, 청킹 설정)
+  - [x] llama3.2 모델 추가
+  - [x] chunking map/reduce 모델을 llama3.1로 변경 (API 비용 절감)
 - [x] 단위 테스트 (`tests/unit/test_config.py`) — 12개 통과
 
 ### M3.2 LLM 클라이언트 — 인터페이스
@@ -198,7 +218,8 @@
   - [x] `LLMResponse` dataclass (content, model, usage)
   - [x] `LLMClient` Protocol (generate, generate_stream, count_tokens, provider_name, max_context_tokens, available_models)
   - [x] (리뷰) `@runtime_checkable` 추가, 팩토리 테스트에 isinstance 검증 추가
-- [x] 단위 테스트 (`tests/unit/test_llm_base.py`) — 4개 통과
+- [x] `messages` 필드 추가 — 멀티턴 대화 지원 (기존 user_prompt 단일 메시지와 호환)
+- [x] 단위 테스트 (`tests/unit/test_llm_base.py`) — 6개 통과
 
 ### M3.3 LLM 클라이언트 — Claude
 
@@ -210,7 +231,8 @@
   - [x] 에러 핸들링 (AuthenticationError → LLMAuthError, RateLimitError → LLMRateLimitError)
   - [x] (리뷰) tenacity 재시도 데코레이터 적용 (exponential backoff, 최대 3회)
   - [x] (리뷰) 빈 응답 가드 추가 (response.content 체크)
-- [x] 단위 테스트 (`tests/unit/test_llm_clients.py`) — 8개 통과 (rate limit 재시도, API 에러, 빈 응답 추가)
+  - [x] `messages` 지원 — 멀티턴 대화 시 messages 우선 사용
+- [x] 단위 테스트 (`tests/unit/test_llm_clients.py`) — 9개 통과 (rate limit 재시도, API 에러, 빈 응답, 멀티턴 추가)
 - [ ] 통합 테스트 (`tests/integration/test_llm_clients.py`) *(API 키 필요)*
 
 ### M3.4 LLM 클라이언트 — OpenAI
@@ -222,7 +244,8 @@
   - [x] `available_models` — config에서 모델 목록 로드
   - [x] (리뷰) tenacity 재시도 데코레이터 적용
   - [x] (리뷰) 빈 응답 가드 추가 (response.choices 체크)
-- [x] 단위 테스트 — 5개 통과 (rate limit 재시도, 빈 choices 추가)
+  - [x] `messages` 지원 — 멀티턴 대화 시 messages 우선 사용
+- [x] 단위 테스트 — 6개 통과 (rate limit 재시도, 빈 choices, 멀티턴 추가)
 - [ ] 통합 테스트 *(API 키 필요)*
 
 ### M3.5 LLM 클라이언트 — Llama
@@ -235,7 +258,8 @@
   - [x] (리뷰) AsyncClient를 인스턴스 속성으로 재사용 (요청마다 재생성 방지)
   - [x] (리뷰) json import을 모듈 레벨로 이동
   - [x] (리뷰) 빈 응답 가드 추가 (.get() 체이닝)
-- [x] 단위 테스트 — 6개 통과 (빈 응답, HTTP 에러 추가)
+  - [x] `messages` 지원 — 멀티턴 대화 시 messages 우선 사용
+- [x] 단위 테스트 — 7개 통과 (빈 응답, HTTP 에러, 멀티턴 추가)
 - [ ] 통합 테스트 *(Ollama 서버 필요)*
 
 ### M3.6 LLM 팩토리
@@ -255,9 +279,14 @@
 
 - [x] `ui/components/llm_selector.py` — 프로바이더/모델 선택 컴포넌트
   - [x] (리뷰) config/llm_config.yaml에서 모델 목록 로드, 실패 시 fallback
+- [x] `ui/components/chat_panel.py` — 재사용 가능한 LLM 대화 패널 컴포넌트
+  - [x] 대화 이력 표시 (role별 chat_message, 복사 팝오버, 토큰 표시)
+  - [x] 메시지 입력 + 전송 버튼
 - [x] 글 작성 페이지에 페어 라이팅 모드 UI 추가
-  - [x] 초안 입력 → 프로바이더/모델 선택 → [LLM 피드백 요청]
-  - [x] LLM 피드백 표시 영역 (모델, 토큰 정보 포함)
+  - [x] 좌우 2단 레이아웃 (에디터 + LLM 대화 패널)
+  - [x] 멀티턴 대화 지원 (chat_panel 컴포넌트 연동)
+  - [x] 현재 초안 포함 옵션 (대화에 에디터 내용 자동 첨부)
+  - [x] 대화 초기화 버튼
   - [x] 미리보기 (다이얼로그 팝업)
   - [x] 면책 조항 플래그 자동 설정 (llm_assisted = true)
   - [x] (리뷰) [게시하기] 버튼 추가 (llm_assisted=True PostMetadata)
@@ -269,8 +298,10 @@
 ### M3.9 Streamlit — 자동 생성 모드 (기본)
 
 - [x] 글 작성 페이지에 자동 생성 모드 UI 추가
-  - [x] 텍스트 입력(주제/지시) → 프로바이더/모델 선택 → [생성 요청]
-  - [x] 생성된 초안 편집 가능 (session_state 관리)
+  - [x] 생성 전/후 2단계 UI (생성 전: 소스+프롬프트, 생성 후: 에디터+대화)
+  - [x] 좌우 2단 레이아웃 (에디터 + LLM 대화 패널)
+  - [x] 멀티턴 대화 지원 — 수정 요청 시 에디터 내용 자동 갱신
+  - [x] 대화 초기화 버튼 (session_state 전체 리셋)
   - [x] 미리보기 + [게시하기] (llm_generated + llm_model 메타데이터 포함)
   - [x] 면책 조항 플래그 자동 설정 (llm_generated = true)
   - [x] (소스 입력은 M4에서 추가)

@@ -6,12 +6,13 @@ from pathlib import Path
 
 import streamlit as st
 
-from core.content.image_manager import ImageInfo, ImageManager
+from core.content.image_manager import ImageInfo, ImageManager, get_base_path
 
 
 @st.cache_resource
 def _get_image_manager() -> ImageManager:
-    return ImageManager(Path("hugo-site/static"))
+    hugo_dir = Path("hugo-site")
+    return ImageManager(hugo_dir / "static", base_path=get_base_path(hugo_dir))
 
 
 def image_picker(
