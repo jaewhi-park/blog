@@ -19,6 +19,12 @@ hugo-site/.hugo_build.lock
 # Runtime data (project root only, not hugo-site/data/)
 /data/
 
+# Project internal docs (not for public sharing)
+PRD.md
+TRD.md
+TASKS.md
+CLAUDE.md
+
 # IDE
 .vscode/
 .idea/
