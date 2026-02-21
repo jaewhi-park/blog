@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -23,6 +24,7 @@ class LlamaClient:
         self._config = config
         self._default_model = config.get("default_model", "llama3.1")
         self._models: list[dict] = config.get("models", [])
+        self._client = httpx.AsyncClient(timeout=120.0)
 
     @property
     def provider_name(self) -> str:
@@ -43,32 +45,34 @@ class LlamaClient:
         """Ollama API를 호출하여 응답을 생성한다."""
         model = request.model or self._default_model
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    f"{self._endpoint}/api/chat",
-                    json={
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": request.system_prompt},
-                            {"role": "user", "content": request.user_prompt},
-                        ],
-                        "stream": False,
-                        "options": {
-                            "temperature": request.temperature,
-                            "num_predict": request.max_tokens,
-                        },
+            response = await self._client.post(
+                f"{self._endpoint}/api/chat",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": request.system_prompt},
+                        {"role": "user", "content": request.user_prompt},
+                    ],
+                    "stream": False,
+                    "options": {
+                        "temperature": request.temperature,
+                        "num_predict": request.max_tokens,
                     },
-                )
-                response.raise_for_status()
-                data = response.json()
-                return LLMResponse(
-                    content=data["message"]["content"],
-                    model=model,
-                    usage={
-                        "input_tokens": data.get("prompt_eval_count", 0),
-                        "output_tokens": data.get("eval_count", 0),
-                    },
-                )
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data.get("message", {}).get("content")
+            if content is None:
+                raise LLMError("Ollama API가 빈 응답을 반환했습니다.")
+            return LLMResponse(
+                content=content,
+                model=model,
+                usage={
+                    "input_tokens": data.get("prompt_eval_count", 0),
+                    "output_tokens": data.get("eval_count", 0),
+                },
+            )
         except httpx.HTTPError as e:
             raise LLMError(f"Ollama API 에러: {e}") from e
 
@@ -76,30 +80,27 @@ class LlamaClient:
         """Ollama API 스트리밍 응답을 생성한다."""
         model = request.model or self._default_model
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self._endpoint}/api/chat",
-                    json={
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": request.system_prompt},
-                            {"role": "user", "content": request.user_prompt},
-                        ],
-                        "stream": True,
-                        "options": {
-                            "temperature": request.temperature,
-                            "num_predict": request.max_tokens,
-                        },
+            async with self._client.stream(
+                "POST",
+                f"{self._endpoint}/api/chat",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": request.system_prompt},
+                        {"role": "user", "content": request.user_prompt},
+                    ],
+                    "stream": True,
+                    "options": {
+                        "temperature": request.temperature,
+                        "num_predict": request.max_tokens,
                     },
-                ) as response:
-                    import json
-
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            data = json.loads(line)
-                            if "message" in data and "content" in data["message"]:
-                                yield data["message"]["content"]
+                },
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        data = json.loads(line)
+                        if "message" in data and "content" in data["message"]:
+                            yield data["message"]["content"]
         except httpx.HTTPError as e:
             raise LLMError(f"Ollama API 에러: {e}") from e
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import openai
 import pytest
 
@@ -228,22 +229,36 @@ class TestLlamaClient:
         client = LlamaClient(config=LLAMA_CONFIG)
 
         mock_response = MagicMock()
-        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "message": {"content": "Llama says hi"},
             "prompt_eval_count": 6,
             "eval_count": 3,
         }
+        client._client.post = AsyncMock(return_value=mock_response)
 
-        with patch("core.llm.llama_client.httpx.AsyncClient") as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_cls.return_value = mock_client
+        response = await client.generate(llm_request)
+        assert response.content == "Llama says hi"
+        assert response.usage["input_tokens"] == 6
+        assert response.usage["output_tokens"] == 3
 
-            response = await client.generate(llm_request)
-            assert response.content == "Llama says hi"
-            assert response.usage["input_tokens"] == 6
-            assert response.usage["output_tokens"] == 3
+    @pytest.mark.asyncio()
+    async def test_generate_empty_response(self, llm_request: LLMRequest) -> None:
+        client = LlamaClient(config=LLAMA_CONFIG)
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {}
+        client._client.post = AsyncMock(return_value=mock_response)
+
+        with pytest.raises(LLMError, match="빈 응답"):
+            await client.generate(llm_request)
+
+    @pytest.mark.asyncio()
+    async def test_generate_http_error(self, llm_request: LLMRequest) -> None:
+        client = LlamaClient(config=LLAMA_CONFIG)
+        client._client.post = AsyncMock(
+            side_effect=httpx.ConnectError("connection refused")
+        )
+        with pytest.raises(LLMError, match="Ollama API 에러"):
+            await client.generate(llm_request)
