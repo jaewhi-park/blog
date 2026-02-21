@@ -1,0 +1,1 @@
+"""whi-blog core package."""

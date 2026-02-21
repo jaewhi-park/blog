@@ -1,0 +1,13 @@
+{{ $disclaimer := .Page.Params.llm_disclaimer }}
+{{ if $disclaimer }}
+  {{ $config := site.Data.disclaimer }}
+  {{ if .Page.Params.llm_generated }}
+    <div class="disclaimer disclaimer-{{ $config.llm_generated.style }}">
+      {{ $config.llm_generated.text }}
+    </div>
+  {{ else if .Page.Params.llm_assisted }}
+    <div class="disclaimer disclaimer-{{ $config.llm_assisted.style }}">
+      {{ $config.llm_assisted.text }}
+    </div>
+  {{ end }}
+{{ end }}

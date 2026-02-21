@@ -1,0 +1,7 @@
+llm_generated:
+  text: "이 글은 AI(LLM)에 의해 자동 생성되었습니다. 내용의 정확성을 보장하지 않으며, 참고 목적으로만 활용해 주세요."
+  style: "warning"
+
+llm_assisted:
+  text: "이 글은 AI(LLM)의 도움을 받아 작성되었습니다. 최종 내용은 작성자가 검토 및 편집하였습니다."
+  style: "info"

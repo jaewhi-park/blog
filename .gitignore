@@ -1,0 +1,39 @@
+# Environment & secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Hugo build
+hugo-site/public/
+hugo-site/resources/
+hugo-site/.hugo_build.lock
+
+# Runtime data (project root only, not hugo-site/data/)
+/data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/

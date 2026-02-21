@@ -1,0 +1,29 @@
+baseURL = "https://username.github.io/whi-blog/"
+languageCode = "ko"
+title = "whi-blog"
+theme = "hugo-book"
+
+[params]
+  BookTheme = "auto"
+  BookToC = true
+  BookComments = true
+
+[params.giscus]
+  repo = "username/whi-blog"
+  repoId = ""
+  category = "Comments"
+  categoryId = ""
+  mapping = "pathname"
+  reactionsEnabled = "1"
+  emitMetadata = "0"
+  theme = "preferred_color_scheme"
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+[markup.goldmark.extensions.passthrough]
+  enable = true
+
+[markup.goldmark.extensions.passthrough.delimiters]
+  block = [["\\[", "\\]"], ["$$", "$$"]]
+  inline = [["\\(", "\\)"], ["$", "$"]]

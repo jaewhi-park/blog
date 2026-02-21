@@ -1,0 +1,29 @@
+{{ define "main" }}
+<article class="markdown book-article">
+  {{- .Content -}}
+
+  <hr>
+
+  <h2>Recent Posts</h2>
+  {{ $pages := where .Site.RegularPages "Kind" "page" }}
+  {{ $posts := where $pages ".File.Path" "ne" "" }}
+  {{ range first 10 (sort $posts ".Date" "desc") }}
+    {{ if not .Params.bookHidden }}
+    <div class="book-post-item" style="margin-bottom: 1.2rem;">
+      <h3 style="margin-bottom: 0.2rem;">
+        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+      </h3>
+      <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.3rem;">
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>
+        {{ with .Params.categories }}
+          · {{ range $i, $c := . }}{{ if $i }}, {{ end }}{{ $c }}{{ end }}
+        {{ end }}
+      </div>
+      {{ if .Summary }}
+      <p style="font-size: 0.9rem; color: #444; margin: 0;">{{ .Summary | truncate 150 }}</p>
+      {{ end }}
+    </div>
+    {{ end }}
+  {{ end }}
+</article>
+{{ end }}

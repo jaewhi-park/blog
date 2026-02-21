@@ -1,0 +1,17 @@
+{{ if .Site.Params.BookComments }}
+{{ with .Site.Params.giscus }}
+<script src="https://giscus.app/client.js"
+  data-repo="{{ .repo }}"
+  data-repo-id="{{ .repoId }}"
+  data-category="{{ .category }}"
+  data-category-id="{{ .categoryId }}"
+  data-mapping="{{ .mapping }}"
+  data-reactions-enabled="{{ .reactionsEnabled }}"
+  data-emit-metadata="{{ .emitMetadata }}"
+  data-theme="{{ .theme }}"
+  data-lang="ko"
+  crossorigin="anonymous"
+  async>
+</script>
+{{ end }}
+{{ end }}
