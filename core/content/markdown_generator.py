@@ -30,7 +30,7 @@ class PostMetadata:
             self.llm_disclaimer = True
 
 
-def _slugify(text: str) -> str:
+def slugify(text: str) -> str:
     """제목을 URL-safe 슬러그로 변환. 한글을 보존한다."""
     import re
     import unicodedata
@@ -115,7 +115,7 @@ class MarkdownGenerator:
         Returns:
             저장된 파일의 Path.
         """
-        slug = _slugify(metadata.title)
+        slug = slugify(metadata.title)
         if not slug:
             slug = f"post-{datetime.now(KST).strftime('%Y%m%d%H%M%S')}"
 

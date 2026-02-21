@@ -13,12 +13,12 @@ if _PROJECT_ROOT not in sys.path:
 import streamlit as st  # noqa: E402
 
 from core.content.category_manager import CategoryManager  # noqa: E402
-from core.content.markdown_generator import MarkdownGenerator, PostMetadata, _slugify  # noqa: E402
-from core.publishing.git_manager import GitError, GitManager  # noqa: E402
-from core.publishing.hugo_builder import HugoBuilder, HugoError  # noqa: E402
+from core.content.markdown_generator import MarkdownGenerator, PostMetadata, slugify  # noqa: E402
+from core.exceptions import ConfigError, GitError, HugoError, LLMError  # noqa: E402
+from core.publishing.git_manager import GitManager  # noqa: E402
+from core.publishing.hugo_builder import HugoBuilder  # noqa: E402
 from core.llm.base import LLMRequest  # noqa: E402
 from core.llm.factory import LLMFactory  # noqa: E402
-from core.exceptions import LLMError, ConfigError  # noqa: E402
 from ui.components.editor import image_upload_insert, markdown_editor  # noqa: E402
 from ui.components.llm_selector import llm_selector  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
@@ -106,7 +106,7 @@ if mode == "직접 작성":
 
     # 이미지 업로드
     with st.expander("이미지 업로드"):
-        post_slug = _slugify(title) if title else "untitled"
+        post_slug = slugify(title) if title else "untitled"
         md_ref = image_upload_insert(post_slug=post_slug, key="direct_img")
         if md_ref:
             st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
@@ -167,7 +167,7 @@ if mode == "직접 작성":
     if hugo_preview_clicked:
         try:
             # 임시 저장 후 Hugo 서버로 미리보기
-            post_slug = _slugify(title) if title else "preview"
+            post_slug = slugify(title) if title else "preview"
             tags = [t.strip() for t in tags_input.split(",") if t.strip()]
             categories = [selected_category_path] if selected_category_path else []
             meta = PostMetadata(
@@ -195,13 +195,35 @@ elif mode == "페어 라이팅":
         placeholder="초안을 작성하면 LLM이 피드백을 제공합니다...",
     )
 
+    # 이미지 업로드
+    with st.expander("이미지 업로드"):
+        post_slug = slugify(title) if title else "untitled"
+        md_ref = image_upload_insert(post_slug=post_slug, key="pair_img")
+        if md_ref:
+            st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+
     provider, model = llm_selector(key_prefix="pair")
 
-    col_p1, col_p2, col_p3 = st.columns([1, 1, 2])
+    st.divider()
+
+    # 액션 버튼
+    col_p1, col_p2, col_p3, col_p4 = st.columns([1, 1, 1, 1])
     with col_p1:
-        pair_preview = st.button("미리보기", key="pair_preview_btn")
+        pair_hugo_preview = st.button(
+            "미리보기 (Hugo)", key="pair_hugo_btn", disabled=not content.strip()
+        )
     with col_p2:
+        pair_preview = st.button("미리보기", key="pair_preview_btn")
+    with col_p3:
         feedback_clicked = st.button("LLM 피드백 요청", disabled=not content.strip())
+    with col_p4:
+        pair_publish_disabled = not title or not content.strip()
+        pair_publish_clicked = st.button(
+            "게시하기",
+            type="primary",
+            key="pair_publish",
+            disabled=pair_publish_disabled,
+        )
 
     @st.dialog("미리보기", width="large")
     def _show_pair_preview() -> None:
@@ -209,6 +231,27 @@ elif mode == "페어 라이팅":
 
     if pair_preview:
         _show_pair_preview()
+
+    # Hugo 로컬 미리보기
+    if pair_hugo_preview:
+        try:
+            tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+            categories = [selected_category_path] if selected_category_path else []
+            meta = PostMetadata(
+                title=title or "Preview",
+                categories=categories,
+                tags=tags,
+                draft=True,
+                math=use_math,
+                llm_assisted=True,
+            )
+            gen = MarkdownGenerator()
+            file_path = gen.save(meta, content, HUGO_CONTENT, selected_category_path)
+            hugo_builder.serve()
+            url = hugo_builder.get_preview_url(file_path)
+            st.markdown(f"Hugo 서버에서 미리보기: [{url}]({url})")
+        except HugoError as e:
+            st.error(f"Hugo 서버 실행 실패: {e}")
 
     # LLM 피드백
     if feedback_clicked:
@@ -237,6 +280,28 @@ elif mode == "페어 라이팅":
             )
         except (ConfigError, LLMError) as e:
             st.error(f"LLM 호출 실패: {e}")
+
+    # 게시하기
+    if pair_publish_clicked:
+        tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+        categories = [selected_category_path] if selected_category_path else []
+        meta = PostMetadata(
+            title=title,
+            categories=categories,
+            tags=tags,
+            draft=is_draft,
+            math=use_math,
+            llm_assisted=True,
+        )
+        gen = MarkdownGenerator()
+        file_path = gen.save(meta, content, HUGO_CONTENT, selected_category_path)
+        rel_path = file_path.relative_to(PROJECT_ROOT)
+        st.success(f"파일 저장됨: `{rel_path}`")
+        try:
+            sha = git_mgr.commit_and_push(f"post: {title}", [file_path], push=True)
+            st.success(f"Git push 완료 (commit: `{sha}`)")
+        except GitError as e:
+            st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
 
 # ── 자동 생성 모드 ──────────────────────────────────────────
 elif mode == "자동 생성":

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from core.content.markdown_generator import MarkdownGenerator, PostMetadata, _slugify
+from core.content.markdown_generator import MarkdownGenerator, PostMetadata, slugify
 
 
 class TestPostMetadata:
@@ -26,16 +26,16 @@ class TestPostMetadata:
 
 class TestSlugify:
     def test_basic(self) -> None:
-        assert _slugify("Hello World") == "hello-world"
+        assert slugify("Hello World") == "hello-world"
 
     def test_special_characters(self) -> None:
-        assert _slugify("Wigner의 반원 법칙") == "wigner의-반원-법칙"
+        assert slugify("Wigner의 반원 법칙") == "wigner의-반원-법칙"
 
     def test_multiple_spaces(self) -> None:
-        assert _slugify("a   b   c") == "a-b-c"
+        assert slugify("a   b   c") == "a-b-c"
 
     def test_empty_string(self) -> None:
-        assert _slugify("") == ""
+        assert slugify("") == ""
 
 
 class TestMarkdownGenerator:
