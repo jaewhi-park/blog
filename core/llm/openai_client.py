@@ -6,9 +6,22 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import openai
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from core.exceptions import LLMAuthError, LLMError, LLMRateLimitError
 from core.llm.base import LLMRequest, LLMResponse
+
+_RETRY_DECORATOR = retry(
+    retry=retry_if_exception_type(LLMRateLimitError),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 
 
 class OpenAIClient:
@@ -40,6 +53,7 @@ class OpenAIClient:
     def available_models(self) -> list[dict]:
         return self._models
 
+    @_RETRY_DECORATOR
     async def generate(self, request: LLMRequest) -> LLMResponse:
         """OpenAI API를 호출하여 응답을 생성한다."""
         model = request.model or self._default_model
@@ -53,6 +67,8 @@ class OpenAIClient:
                     {"role": "user", "content": request.user_prompt},
                 ],
             )
+            if not response.choices:
+                raise LLMError("OpenAI API가 빈 응답을 반환했습니다.")
             choice = response.choices[0]
             usage = response.usage
             return LLMResponse(

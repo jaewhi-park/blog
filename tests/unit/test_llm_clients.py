@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import openai
 import pytest
 
 from core.exceptions import LLMAuthError, LLMError, LLMRateLimitError
@@ -175,6 +176,32 @@ class TestOpenAIClient:
         assert response.content == "GPT says hi"
         assert response.usage["input_tokens"] == 8
         assert response.usage["output_tokens"] == 4
+
+    @pytest.mark.asyncio()
+    async def test_generate_rate_limit_error(self, llm_request: LLMRequest) -> None:
+        client = OpenAIClient(api_key="test", config=OPENAI_CONFIG)
+        client._client.chat.completions.create = AsyncMock(
+            side_effect=openai.RateLimitError(
+                message="rate limited",
+                response=MagicMock(status_code=429),
+                body=None,
+            )
+        )
+        with pytest.raises(LLMRateLimitError):
+            await client.generate(llm_request)
+        assert client._client.chat.completions.create.call_count == 3
+
+    @pytest.mark.asyncio()
+    async def test_generate_empty_choices(self, llm_request: LLMRequest) -> None:
+        client = OpenAIClient(api_key="test", config=OPENAI_CONFIG)
+
+        mock_response = MagicMock()
+        mock_response.choices = []
+
+        client._client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+        with pytest.raises(LLMError, match="빈 응답"):
+            await client.generate(llm_request)
 
 
 # ── LlamaClient ──────────────────────────────────────────────
