@@ -26,6 +26,20 @@ class TestLLMRequest:
         assert req.temperature == 0.3
         assert req.max_tokens == 2048
 
+    def test_messages_default_none(self) -> None:
+        req = LLMRequest(system_prompt="sys", user_prompt="user")
+        assert req.messages is None
+
+    def test_messages_provided(self) -> None:
+        msgs = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"},
+            {"role": "user", "content": "how are you?"},
+        ]
+        req = LLMRequest(system_prompt="sys", user_prompt="ignored", messages=msgs)
+        assert req.messages == msgs
+        assert len(req.messages) == 3
+
 
 class TestLLMResponse:
     """LLMResponse 데이터클래스 테스트."""

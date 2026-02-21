@@ -13,6 +13,7 @@ class LLMRequest:
 
     system_prompt: str
     user_prompt: str
+    messages: list[dict[str, str]] | None = None
     model: str | None = None
     temperature: float = 0.7
     max_tokens: int = 4096

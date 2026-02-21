@@ -24,12 +24,13 @@ from ui.components.llm_selector import llm_selector  # noqa: E402
 from ui.components.image_picker import image_picker  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
 from ui.components.source_input import source_input  # noqa: E402
+from ui.components.chat_panel import chat_panel  # noqa: E402
 
 st.set_page_config(page_title="글 작성 | whi-blog", layout="wide")
 
 # ── 경로 설정 ──────────────────────────────────────────────
 PROJECT_ROOT = Path(_PROJECT_ROOT)
-HUGO_SITE = Path("hugo-site")
+HUGO_SITE = PROJECT_ROOT / "hugo-site"
 HUGO_CONTENT = HUGO_SITE / "content"
 HUGO_STATIC = HUGO_SITE / "static"
 git_mgr = GitManager(PROJECT_ROOT)
@@ -190,21 +191,83 @@ if mode == "직접 작성":
 
 # ── 페어 라이팅 모드 ────────────────────────────────────────
 elif mode == "페어 라이팅":
-    st.markdown("#### 에디터")
-    content = markdown_editor(
-        key="pair_editor",
-        height=500,
-        placeholder="초안을 작성하면 LLM이 피드백을 제공합니다...",
-    )
-
-    # 이미지 업로드
-    with st.expander("이미지 업로드"):
-        post_slug = slugify(title) if title else "untitled"
-        md_ref = image_upload_insert(post_slug=post_slug, key="pair_img")
-        if md_ref:
-            st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+    # 대화 이력 초기화
+    if "pair_chat_messages" not in st.session_state:
+        st.session_state["pair_chat_messages"] = []
 
     provider, model = llm_selector(key_prefix="pair")
+
+    col_editor, col_chat = st.columns([1, 1])
+
+    with col_editor:
+        st.markdown("#### 에디터")
+        content = markdown_editor(
+            key="pair_editor",
+            height=500,
+            placeholder="초안을 작성하면 LLM이 피드백을 제공합니다...",
+        )
+
+        # 이미지 업로드
+        with st.expander("이미지 업로드"):
+            post_slug = slugify(title) if title else "untitled"
+            md_ref = image_upload_insert(post_slug=post_slug, key="pair_img")
+            if md_ref:
+                st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+
+    with col_chat:
+        st.markdown("#### LLM 대화")
+        include_draft = st.checkbox(
+            "현재 초안 포함", value=True, key="pair_include_draft"
+        )
+        new_msg = chat_panel(
+            messages=st.session_state["pair_chat_messages"],
+            key_prefix="pair",
+            input_placeholder="피드백을 요청하세요...",
+            height=400,
+        )
+
+        if new_msg:
+            import asyncio
+
+            # 초안 포함 옵션
+            user_content = new_msg
+            if include_draft and content and content.strip():
+                user_content = f"{new_msg}\n\n---\n현재 초안:\n\n{content}"
+
+            st.session_state["pair_chat_messages"].append(
+                {"role": "user", "content": user_content}
+            )
+
+            try:
+                client = LLMFactory.create(provider)
+                request = LLMRequest(
+                    system_prompt=(
+                        "당신은 기술 블로그 글 작성을 돕는 편집자입니다. "
+                        "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
+                        "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
+                    ),
+                    user_prompt="",
+                    messages=[
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state["pair_chat_messages"]
+                    ],
+                    model=model,
+                )
+                with st.spinner("LLM 응답 생성 중..."):
+                    response = asyncio.run(client.generate(request))
+
+                st.session_state["pair_chat_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": response.content,
+                        "usage": response.usage,
+                    }
+                )
+                st.rerun()
+            except (ConfigError, LLMError) as e:
+                st.error(f"LLM 호출 실패: {e}")
+                # 실패 시 마지막 user 메시지 제거
+                st.session_state["pair_chat_messages"].pop()
 
     st.divider()
 
@@ -217,8 +280,6 @@ elif mode == "페어 라이팅":
     with col_p2:
         pair_preview = st.button("미리보기", key="pair_preview_btn")
     with col_p3:
-        feedback_clicked = st.button("LLM 피드백 요청", disabled=not content.strip())
-    with col_p4:
         pair_publish_disabled = not title or not content.strip()
         pair_publish_clicked = st.button(
             "게시하기",
@@ -226,6 +287,10 @@ elif mode == "페어 라이팅":
             key="pair_publish",
             disabled=pair_publish_disabled,
         )
+    with col_p4:
+        if st.button("대화 초기화", key="pair_reset_chat"):
+            st.session_state["pair_chat_messages"] = []
+            st.rerun()
 
     @st.dialog("미리보기", width="large")
     def _show_pair_preview() -> None:
@@ -255,34 +320,6 @@ elif mode == "페어 라이팅":
         except HugoError as e:
             st.error(f"Hugo 서버 실행 실패: {e}")
 
-    # LLM 피드백
-    if feedback_clicked:
-        import asyncio
-
-        try:
-            client = LLMFactory.create(provider)
-            request = LLMRequest(
-                system_prompt=(
-                    "당신은 기술 블로그 글 작성을 돕는 편집자입니다. "
-                    "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
-                    "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
-                ),
-                user_prompt=f"다음 초안에 대한 피드백을 제공해주세요:\n\n{content}",
-                model=model,
-            )
-            with st.spinner("LLM 피드백 생성 중..."):
-                response = asyncio.run(client.generate(request))
-
-            st.markdown("#### LLM 피드백")
-            st.markdown(response.content)
-            st.caption(
-                f"모델: {response.model} | "
-                f"토큰: {response.usage.get('input_tokens', 0)} in / "
-                f"{response.usage.get('output_tokens', 0)} out"
-            )
-        except (ConfigError, LLMError) as e:
-            st.error(f"LLM 호출 실패: {e}")
-
     # 게시하기
     if pair_publish_clicked:
         tags = [t.strip() for t in tags_input.split(",") if t.strip()]
@@ -307,113 +344,197 @@ elif mode == "페어 라이팅":
 
 # ── 자동 생성 모드 ──────────────────────────────────────────
 elif mode == "자동 생성":
-    # 소스 입력
-    with st.expander("소스 자료 (PDF, URL, arXiv)", expanded=False):
-        auto_sources = source_input(key_prefix="auto_source")
-        if auto_sources:
-            st.caption(f"{len(auto_sources)}개 소스 등록됨")
+    # 대화 이력 초기화
+    if "auto_chat_messages" not in st.session_state:
+        st.session_state["auto_chat_messages"] = []
+    if "auto_generated_content" not in st.session_state:
+        st.session_state["auto_generated_content"] = ""
+    if "auto_editor_version" not in st.session_state:
+        st.session_state["auto_editor_version"] = 0
 
-    prompt = st.text_area(
-        "주제 / 지시사항",
-        height=150,
-        placeholder="생성할 글의 주제나 지시사항을 입력하세요...",
-        label_visibility="collapsed",
-    )
-
-    provider, model = llm_selector(key_prefix="auto")
-
-    if st.button("생성 요청", type="primary", disabled=not prompt.strip()):
-        import asyncio
-
-        from core.exceptions import SourceError  # noqa: E402
-        from core.sources.aggregator import SourceAggregator  # noqa: E402
-        from core.sources.arxiv_client import ArxivClient  # noqa: E402
-        from core.sources.pdf_parser import PDFParser  # noqa: E402
-        from core.sources.url_crawler import URLCrawler  # noqa: E402
-
-        try:
-            # 소스 자료 수집
-            source_text = ""
+    # 생성 전 단계 (아직 초안이 없을 때)
+    if not st.session_state["auto_generated_content"]:
+        # 소스 입력
+        with st.expander("소스 자료 (PDF, URL, arXiv)", expanded=False):
+            auto_sources = source_input(key_prefix="auto_source")
             if auto_sources:
-                aggregator = SourceAggregator(
-                    PDFParser(),
-                    URLCrawler(),
-                    ArxivClient(),
-                )
-                with st.spinner("소스 자료 수집 중..."):
-                    aggregated = asyncio.run(aggregator.aggregate(auto_sources))
-                source_text = aggregated.combined_text
-                st.session_state["auto_source_images"] = aggregated.images
-                st.session_state["auto_source_image_data"] = aggregated.image_data
+                st.caption(f"{len(auto_sources)}개 소스 등록됨")
 
-            user_prompt = prompt
-            if source_text:
-                user_prompt = (
-                    f"다음 소스 자료를 참고하여 글을 작성하세요:\n\n"
-                    f"{source_text}\n\n---\n\n"
-                    f"지시사항: {prompt}"
-                )
-
-            client = LLMFactory.create(provider)
-            request = LLMRequest(
-                system_prompt=(
-                    "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
-                    "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
-                    "영어 수학/기술 용어는 그대로 유지하세요. "
-                    "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
-                    "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
-                ),
-                user_prompt=user_prompt,
-                model=model,
-            )
-            with st.spinner("글 생성 중..."):
-                response = asyncio.run(client.generate(request))
-
-            st.session_state["auto_generated_content"] = response.content
-            st.session_state["auto_generated_model"] = response.model
-            st.caption(
-                f"모델: {response.model} | "
-                f"토큰: {response.usage.get('input_tokens', 0)} in / "
-                f"{response.usage.get('output_tokens', 0)} out"
-            )
-        except SourceError as e:
-            st.error(f"소스 수집 실패: {e}")
-        except (ConfigError, LLMError) as e:
-            st.error(f"LLM 호출 실패: {e}")
-
-    # 생성된 초안 편집 + 게시
-    if "auto_generated_content" in st.session_state:
-        st.markdown("#### 생성된 초안 (편집 가능)")
-        edited = markdown_editor(
-            key="auto_editor",
-            height=500,
-            initial_value=st.session_state["auto_generated_content"],
+        prompt = st.text_area(
+            "주제 / 지시사항",
+            height=150,
+            placeholder="생성할 글의 주제나 지시사항을 입력하세요...",
+            label_visibility="collapsed",
         )
 
-        # 이미지 업로드
-        with st.expander("이미지 업로드"):
-            post_slug = slugify(title) if title else "untitled"
-            md_ref = image_upload_insert(post_slug=post_slug, key="auto_img")
-            if md_ref:
-                st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+        provider, model = llm_selector(key_prefix="auto")
 
-        # PDF 추출 이미지 선택
-        source_images = st.session_state.get("auto_source_images", [])
-        source_image_data = st.session_state.get("auto_source_image_data", {})
-        if source_images:
-            with st.expander("소스 추출 이미지", expanded=False):
-                post_slug = slugify(title) if title else "untitled"
-                image_picker(
-                    source_images,
-                    source_image_data,
-                    post_slug=post_slug,
-                    key_prefix="auto_img_picker",
+        if st.button("생성 요청", type="primary", disabled=not prompt.strip()):
+            import asyncio
+
+            from core.exceptions import SourceError  # noqa: E402
+            from core.sources.aggregator import SourceAggregator  # noqa: E402
+            from core.sources.arxiv_client import ArxivClient  # noqa: E402
+            from core.sources.pdf_parser import PDFParser  # noqa: E402
+            from core.sources.url_crawler import URLCrawler  # noqa: E402
+
+            try:
+                # 소스 자료 수집
+                source_text = ""
+                if auto_sources:
+                    aggregator = SourceAggregator(
+                        PDFParser(),
+                        URLCrawler(),
+                        ArxivClient(),
+                    )
+                    with st.spinner("소스 자료 수집 중..."):
+                        aggregated = asyncio.run(aggregator.aggregate(auto_sources))
+                    source_text = aggregated.combined_text
+                    st.session_state["auto_source_images"] = aggregated.images
+                    st.session_state["auto_source_image_data"] = aggregated.image_data
+
+                user_content = prompt
+                if source_text:
+                    user_content = (
+                        f"다음 소스 자료를 참고하여 글을 작성하세요:\n\n"
+                        f"{source_text}\n\n---\n\n"
+                        f"지시사항: {prompt}"
+                    )
+
+                client = LLMFactory.create(provider)
+                request = LLMRequest(
+                    system_prompt=(
+                        "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+                        "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+                        "영어 수학/기술 용어는 그대로 유지하세요. "
+                        "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+                        "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+                    ),
+                    user_prompt=user_content,
+                    model=model,
                 )
+                with st.spinner("글 생성 중..."):
+                    response = asyncio.run(client.generate(request))
+
+                st.session_state["auto_generated_content"] = response.content
+                st.session_state["auto_generated_model"] = response.model
+                st.session_state["auto_saved_provider"] = provider
+                st.session_state["auto_saved_model"] = model
+                st.session_state["auto_editor_version"] = 0
+                # 대화 이력에 첫 턴 기록
+                st.session_state["auto_chat_messages"] = [
+                    {"role": "user", "content": user_content},
+                    {
+                        "role": "assistant",
+                        "content": response.content,
+                        "usage": response.usage,
+                    },
+                ]
+                st.rerun()
+            except SourceError as e:
+                st.error(f"소스 수집 실패: {e}")
+            except (ConfigError, LLMError) as e:
+                st.error(f"LLM 호출 실패: {e}")
+
+    # 생성 후 단계 (초안이 있을 때) — 좌우 2단 레이아웃
+    else:
+        provider = st.session_state.get("auto_saved_provider", "claude")
+        model = st.session_state.get("auto_saved_model", None)
+
+        col_editor, col_chat = st.columns([1, 1])
+
+        with col_editor:
+            st.markdown("#### 생성된 초안 (편집 가능)")
+            editor_key = f"auto_editor_v{st.session_state['auto_editor_version']}"
+            edited = markdown_editor(
+                key=editor_key,
+                height=500,
+                initial_value=st.session_state["auto_generated_content"],
+            )
+
+            # 이미지 업로드
+            with st.expander("이미지 업로드"):
+                post_slug = slugify(title) if title else "untitled"
+                md_ref = image_upload_insert(post_slug=post_slug, key="auto_img")
+                if md_ref:
+                    st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+
+            # PDF 추출 이미지 선택
+            source_images = st.session_state.get("auto_source_images", [])
+            source_image_data = st.session_state.get("auto_source_image_data", {})
+            if source_images:
+                with st.expander("소스 추출 이미지", expanded=False):
+                    post_slug = slugify(title) if title else "untitled"
+                    image_picker(
+                        source_images,
+                        source_image_data,
+                        post_slug=post_slug,
+                        key_prefix="auto_img_picker",
+                    )
+
+        with col_chat:
+            st.markdown("#### LLM 대화")
+            include_current = st.checkbox(
+                "현재 에디터 내용 기준", value=True, key="auto_include_current"
+            )
+            new_msg = chat_panel(
+                messages=st.session_state["auto_chat_messages"],
+                key_prefix="auto",
+                input_placeholder="수정 요청을 입력하세요...",
+                height=400,
+            )
+
+            if new_msg:
+                import asyncio
+
+                # 에디터 내용 포함 옵션
+                user_content = new_msg
+                if include_current and edited and edited.strip():
+                    user_content = f"{new_msg}\n\n---\n현재 초안:\n\n{edited}"
+
+                st.session_state["auto_chat_messages"].append(
+                    {"role": "user", "content": user_content}
+                )
+
+                try:
+                    client = LLMFactory.create(provider)
+                    request = LLMRequest(
+                        system_prompt=(
+                            "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+                            "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+                            "영어 수학/기술 용어는 그대로 유지하세요. "
+                            "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+                            "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+                        ),
+                        user_prompt="",
+                        messages=[
+                            {"role": m["role"], "content": m["content"]}
+                            for m in st.session_state["auto_chat_messages"]
+                        ],
+                        model=model,
+                    )
+                    with st.spinner("LLM 응답 생성 중..."):
+                        response = asyncio.run(client.generate(request))
+
+                    st.session_state["auto_chat_messages"].append(
+                        {
+                            "role": "assistant",
+                            "content": response.content,
+                            "usage": response.usage,
+                        }
+                    )
+                    # 에디터 내용 갱신
+                    st.session_state["auto_generated_content"] = response.content
+                    st.session_state["auto_editor_version"] += 1
+                    st.rerun()
+                except (ConfigError, LLMError) as e:
+                    st.error(f"LLM 호출 실패: {e}")
+                    st.session_state["auto_chat_messages"].pop()
 
         st.divider()
 
         # 액션 버튼
-        col_auto1, col_auto2, col_auto3 = st.columns([1, 1, 1])
+        col_auto1, col_auto2, col_auto3, col_auto4 = st.columns([1, 1, 1, 1])
         with col_auto1:
             auto_hugo_preview = st.button(
                 "미리보기 (Hugo)", key="auto_hugo_btn", disabled=not edited.strip()
@@ -428,6 +549,12 @@ elif mode == "자동 생성":
                 key="auto_publish",
                 disabled=auto_publish_disabled,
             )
+        with col_auto4:
+            if st.button("대화 초기화", key="auto_reset_chat"):
+                st.session_state["auto_chat_messages"] = []
+                st.session_state["auto_generated_content"] = ""
+                st.session_state["auto_editor_version"] = 0
+                st.rerun()
 
         @st.dialog("미리보기", width="large")
         def _show_auto_preview() -> None:
@@ -480,5 +607,12 @@ elif mode == "자동 생성":
             except GitError as e:
                 st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
             # 게시 완료 후 session_state 정리
-            del st.session_state["auto_generated_content"]
-            del st.session_state["auto_generated_model"]
+            for key in [
+                "auto_generated_content",
+                "auto_generated_model",
+                "auto_chat_messages",
+                "auto_saved_provider",
+                "auto_saved_model",
+                "auto_editor_version",
+            ]:
+                st.session_state.pop(key, None)

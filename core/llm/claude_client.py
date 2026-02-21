@@ -63,7 +63,8 @@ class ClaudeClient:
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
                 system=request.system_prompt,
-                messages=[{"role": "user", "content": request.user_prompt}],
+                messages=request.messages
+                or [{"role": "user", "content": request.user_prompt}],
             )
             if not response.content:
                 raise LLMError("Claude API가 빈 응답을 반환했습니다.")
@@ -91,7 +92,8 @@ class ClaudeClient:
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
                 system=request.system_prompt,
-                messages=[{"role": "user", "content": request.user_prompt}],
+                messages=request.messages
+                or [{"role": "user", "content": request.user_prompt}],
             ) as stream:
                 async for text in stream.text_stream:
                     yield text

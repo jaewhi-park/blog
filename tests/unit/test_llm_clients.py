@@ -143,6 +143,35 @@ class TestClaudeClient:
         with pytest.raises(LLMError, match="빈 응답"):
             await client.generate(llm_request)
 
+    @pytest.mark.asyncio()
+    async def test_generate_with_messages(self) -> None:
+        """messages가 제공되면 user_prompt 대신 messages를 사용한다."""
+        client = ClaudeClient(api_key="test", config=CLAUDE_CONFIG)
+
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text="Multi-turn reply")]
+        mock_response.usage.input_tokens = 20
+        mock_response.usage.output_tokens = 10
+
+        client._client.messages.create = AsyncMock(return_value=mock_response)
+
+        messages = [
+            {"role": "user", "content": "first question"},
+            {"role": "assistant", "content": "first answer"},
+            {"role": "user", "content": "follow-up"},
+        ]
+        request = LLMRequest(
+            system_prompt="sys",
+            user_prompt="ignored",
+            messages=messages,
+            model="test-model",
+        )
+        response = await client.generate(request)
+        assert response.content == "Multi-turn reply"
+        # Verify messages were passed correctly
+        call_kwargs = client._client.messages.create.call_args.kwargs
+        assert call_kwargs["messages"] == messages
+
 
 # ── OpenAIClient ─────────────────────────────────────────────
 
@@ -204,6 +233,40 @@ class TestOpenAIClient:
         with pytest.raises(LLMError, match="빈 응답"):
             await client.generate(llm_request)
 
+    @pytest.mark.asyncio()
+    async def test_generate_with_messages(self) -> None:
+        """messages가 제공되면 user_prompt 대신 messages를 사용한다."""
+        client = OpenAIClient(api_key="test", config=OPENAI_CONFIG)
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Multi-turn reply"
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 20
+        mock_usage.completion_tokens = 10
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+
+        client._client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+        messages = [
+            {"role": "user", "content": "first question"},
+            {"role": "assistant", "content": "first answer"},
+            {"role": "user", "content": "follow-up"},
+        ]
+        request = LLMRequest(
+            system_prompt="sys",
+            user_prompt="ignored",
+            messages=messages,
+            model="test-model",
+        )
+        response = await client.generate(request)
+        assert response.content == "Multi-turn reply"
+        # Verify system + messages were passed
+        call_kwargs = client._client.chat.completions.create.call_args.kwargs
+        expected_msgs = [{"role": "system", "content": "sys"}] + messages
+        assert call_kwargs["messages"] == expected_msgs
+
 
 # ── LlamaClient ──────────────────────────────────────────────
 
@@ -262,3 +325,35 @@ class TestLlamaClient:
         )
         with pytest.raises(LLMError, match="Ollama API 에러"):
             await client.generate(llm_request)
+
+    @pytest.mark.asyncio()
+    async def test_generate_with_messages(self) -> None:
+        """messages가 제공되면 user_prompt 대신 messages를 사용한다."""
+        client = LlamaClient(config=LLAMA_CONFIG)
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "message": {"content": "Multi-turn reply"},
+            "prompt_eval_count": 20,
+            "eval_count": 10,
+        }
+        client._client.post = AsyncMock(return_value=mock_response)
+
+        messages = [
+            {"role": "user", "content": "first question"},
+            {"role": "assistant", "content": "first answer"},
+            {"role": "user", "content": "follow-up"},
+        ]
+        request = LLMRequest(
+            system_prompt="sys",
+            user_prompt="ignored",
+            messages=messages,
+            model="test-model",
+        )
+        response = await client.generate(request)
+        assert response.content == "Multi-turn reply"
+        # Verify system + messages were passed
+        call_kwargs = client._client.post.call_args.kwargs
+        expected_msgs = [{"role": "system", "content": "sys"}] + messages
+        assert call_kwargs["json"]["messages"] == expected_msgs

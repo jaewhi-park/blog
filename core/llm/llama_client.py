@@ -49,10 +49,11 @@ class LlamaClient:
                 f"{self._endpoint}/api/chat",
                 json={
                     "model": model,
-                    "messages": [
-                        {"role": "system", "content": request.system_prompt},
-                        {"role": "user", "content": request.user_prompt},
-                    ],
+                    "messages": [{"role": "system", "content": request.system_prompt}]
+                    + (
+                        request.messages
+                        or [{"role": "user", "content": request.user_prompt}]
+                    ),
                     "stream": False,
                     "options": {
                         "temperature": request.temperature,
@@ -85,10 +86,11 @@ class LlamaClient:
                 f"{self._endpoint}/api/chat",
                 json={
                     "model": model,
-                    "messages": [
-                        {"role": "system", "content": request.system_prompt},
-                        {"role": "user", "content": request.user_prompt},
-                    ],
+                    "messages": [{"role": "system", "content": request.system_prompt}]
+                    + (
+                        request.messages
+                        or [{"role": "user", "content": request.user_prompt}]
+                    ),
                     "stream": True,
                     "options": {
                         "temperature": request.temperature,

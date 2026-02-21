@@ -62,10 +62,11 @@ class OpenAIClient:
                 model=model,
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
-                messages=[
-                    {"role": "system", "content": request.system_prompt},
-                    {"role": "user", "content": request.user_prompt},
-                ],
+                messages=[{"role": "system", "content": request.system_prompt}]
+                + (
+                    request.messages
+                    or [{"role": "user", "content": request.user_prompt}]
+                ),
             )
             if not response.choices:
                 raise LLMError("OpenAI API가 빈 응답을 반환했습니다.")
@@ -94,10 +95,11 @@ class OpenAIClient:
                 model=model,
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
-                messages=[
-                    {"role": "system", "content": request.system_prompt},
-                    {"role": "user", "content": request.user_prompt},
-                ],
+                messages=[{"role": "system", "content": request.system_prompt}]
+                + (
+                    request.messages
+                    or [{"role": "user", "content": request.user_prompt}]
+                ),
                 stream=True,
             )
             async for chunk in stream:
