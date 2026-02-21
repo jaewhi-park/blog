@@ -354,39 +354,31 @@ elif mode == "자동 생성":
             initial_value=st.session_state["auto_generated_content"],
         )
 
-        col_auto1, col_auto2 = st.columns([1, 3])
+        # 이미지 업로드
+        with st.expander("이미지 업로드"):
+            post_slug = slugify(title) if title else "untitled"
+            md_ref = image_upload_insert(post_slug=post_slug, key="auto_img")
+            if md_ref:
+                st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+
+        st.divider()
+
+        # 액션 버튼
+        col_auto1, col_auto2, col_auto3 = st.columns([1, 1, 1])
         with col_auto1:
-            auto_preview = st.button("미리보기", key="auto_preview_btn")
+            auto_hugo_preview = st.button(
+                "미리보기 (Hugo)", key="auto_hugo_btn", disabled=not edited.strip()
+            )
         with col_auto2:
+            auto_preview = st.button("미리보기", key="auto_preview_btn")
+        with col_auto3:
             auto_publish_disabled = not title or not edited.strip()
-            if st.button(
+            auto_publish_clicked = st.button(
                 "게시하기",
                 type="primary",
                 key="auto_publish",
                 disabled=auto_publish_disabled,
-            ):
-                tags = [t.strip() for t in tags_input.split(",") if t.strip()]
-                categories = [selected_category_path] if selected_category_path else []
-                meta = PostMetadata(
-                    title=title,
-                    categories=categories,
-                    tags=tags,
-                    draft=is_draft,
-                    math=use_math,
-                    llm_generated=True,
-                    llm_model=st.session_state.get("auto_generated_model", model),
-                )
-                gen = MarkdownGenerator()
-                file_path = gen.save(meta, edited, HUGO_CONTENT, selected_category_path)
-                rel_path = file_path.relative_to(PROJECT_ROOT)
-                st.success(f"파일 저장됨: `{rel_path}`")
-                try:
-                    sha = git_mgr.commit_and_push(
-                        f"post: {title}", [file_path], push=True
-                    )
-                    st.success(f"Git push 완료 (commit: `{sha}`)")
-                except GitError as e:
-                    st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
+            )
 
         @st.dialog("미리보기", width="large")
         def _show_auto_preview() -> None:
@@ -394,3 +386,50 @@ elif mode == "자동 생성":
 
         if auto_preview:
             _show_auto_preview()
+
+        # Hugo 로컬 미리보기
+        if auto_hugo_preview:
+            try:
+                tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+                categories = [selected_category_path] if selected_category_path else []
+                meta = PostMetadata(
+                    title=title or "Preview",
+                    categories=categories,
+                    tags=tags,
+                    draft=True,
+                    math=use_math,
+                    llm_generated=True,
+                )
+                gen = MarkdownGenerator()
+                file_path = gen.save(meta, edited, HUGO_CONTENT, selected_category_path)
+                hugo_builder.serve()
+                url = hugo_builder.get_preview_url(file_path)
+                st.markdown(f"Hugo 서버에서 미리보기: [{url}]({url})")
+            except HugoError as e:
+                st.error(f"Hugo 서버 실행 실패: {e}")
+
+        # 게시하기
+        if auto_publish_clicked:
+            tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+            categories = [selected_category_path] if selected_category_path else []
+            meta = PostMetadata(
+                title=title,
+                categories=categories,
+                tags=tags,
+                draft=is_draft,
+                math=use_math,
+                llm_generated=True,
+                llm_model=st.session_state.get("auto_generated_model", model),
+            )
+            gen = MarkdownGenerator()
+            file_path = gen.save(meta, edited, HUGO_CONTENT, selected_category_path)
+            rel_path = file_path.relative_to(PROJECT_ROOT)
+            st.success(f"파일 저장됨: `{rel_path}`")
+            try:
+                sha = git_mgr.commit_and_push(f"post: {title}", [file_path], push=True)
+                st.success(f"Git push 완료 (commit: `{sha}`)")
+            except GitError as e:
+                st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
+            # 게시 완료 후 session_state 정리
+            del st.session_state["auto_generated_content"]
+            del st.session_state["auto_generated_model"]
