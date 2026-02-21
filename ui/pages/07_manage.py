@@ -13,6 +13,8 @@ if _PROJECT_ROOT not in sys.path:
 import streamlit as st  # noqa: E402
 
 from core.content.category_manager import CategoryManager  # noqa: E402
+import shutil  # noqa: E402  # isort: skip
+
 from core.content.image_manager import ImageManager, get_base_path  # noqa: E402
 from core.content.markdown_generator import PostMetadata, slugify  # noqa: E402
 from core.content.post_manager import PostManager  # noqa: E402
@@ -97,6 +99,9 @@ selected_idx = st.selectbox(
 
 selected_post = filtered_posts[selected_idx]
 
+# 선택된 글이 바뀌면 위젯 state를 리셋하기 위한 고유 키
+_post_key = str(selected_post.file_path)
+
 st.divider()
 
 # ── 선택된 글 로드 ──────────────────────────────────────
@@ -105,12 +110,14 @@ metadata, body = post_mgr.load_post(selected_post.file_path)
 # ── 메타데이터 편집 ──────────────────────────────────────
 col_meta1, col_meta2 = st.columns(2)
 with col_meta1:
-    edit_title = st.text_input("제목", value=metadata.title, key="manage_title")
+    edit_title = st.text_input(
+        "제목", value=metadata.title, key=f"manage_title_{_post_key}"
+    )
 with col_meta2:
     edit_tags = st.text_input(
         "태그 (쉼표 구분)",
         value=", ".join(metadata.tags),
-        key="manage_tags",
+        key=f"manage_tags_{_post_key}",
     )
 
 # 카테고리 드롭다운
@@ -129,7 +136,7 @@ if flat_cats:
         range(len(cat_options)),
         index=default_idx,
         format_func=lambda i: cat_options[i],
-        key="manage_category",
+        key=f"manage_category_{_post_key}",
     )
     edit_category_path = cat_paths[cat_idx]
 else:
@@ -137,10 +144,12 @@ else:
 
 col_opt1, col_opt2 = st.columns(2)
 with col_opt1:
-    edit_draft = st.checkbox("초안 (draft)", value=metadata.draft, key="manage_draft")
+    edit_draft = st.checkbox(
+        "초안 (draft)", value=metadata.draft, key=f"manage_draft_{_post_key}"
+    )
 with col_opt2:
     edit_math = st.checkbox(
-        "수식 렌더링 (KaTeX)", value=metadata.math, key="manage_math"
+        "수식 렌더링 (KaTeX)", value=metadata.math, key=f"manage_math_{_post_key}"
     )
 
 st.divider()
@@ -148,7 +157,7 @@ st.divider()
 # ── 에디터 ──────────────────────────────────────────────
 st.markdown("#### 에디터")
 edit_content = markdown_editor(
-    key="manage_editor",
+    key=f"manage_editor_{_post_key}",
     height=500,
     initial_value=body,
 )
@@ -223,13 +232,27 @@ def _confirm_delete() -> None:
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         if st.button("삭제 확인", type="primary", key="confirm_delete_btn"):
+            # 이미지 경로 수집 (삭제 전에 해야 함)
+            post_slug = slugify(selected_post.title) if selected_post.title else ""
+            image_files = img_mgr.get_image_paths(post_slug) if post_slug else []
+
+            # 게시글 삭제
             post_mgr.delete_post(selected_post.file_path)
+            commit_files = [selected_post.file_path]
+
+            # 이미지 디렉토리 삭제
+            if post_slug:
+                img_dir = HUGO_STATIC / "images" / post_slug
+                if img_dir.exists():
+                    commit_files.extend(image_files)
+                    shutil.rmtree(img_dir)
+
             st.success("파일이 삭제되었습니다.")
 
             try:
                 sha = git_mgr.commit_and_push(
                     f"delete: {selected_post.title}",
-                    [selected_post.file_path],
+                    commit_files,
                     push=True,
                 )
                 st.success(f"Git push 완료 (commit: `{sha}`)")
