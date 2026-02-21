@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 @dataclass
@@ -27,6 +27,7 @@ class LLMResponse:
     usage: dict[str, int] = field(default_factory=dict)
 
 
+@runtime_checkable
 class LLMClient(Protocol):
     """LLM 프로바이더 통합 인터페이스."""
 

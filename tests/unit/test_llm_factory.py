@@ -9,6 +9,7 @@ import yaml
 
 from core.config import Config
 from core.exceptions import ConfigError
+from core.llm.base import LLMClient
 from core.llm.claude_client import ClaudeClient
 from core.llm.factory import LLMFactory
 from core.llm.llama_client import LlamaClient
@@ -51,6 +52,7 @@ class TestLLMFactory:
         config = Config(config_dir=config_dir)
         client = LLMFactory.create("claude", config=config)
         assert isinstance(client, ClaudeClient)
+        assert isinstance(client, LLMClient)
         assert client.provider_name == "claude"
 
     def test_create_openai(
@@ -60,12 +62,14 @@ class TestLLMFactory:
         config = Config(config_dir=config_dir)
         client = LLMFactory.create("openai", config=config)
         assert isinstance(client, OpenAIClient)
+        assert isinstance(client, LLMClient)
         assert client.provider_name == "openai"
 
     def test_create_llama(self, config_dir: Path) -> None:
         config = Config(config_dir=config_dir)
         client = LLMFactory.create("llama", config=config)
         assert isinstance(client, LlamaClient)
+        assert isinstance(client, LLMClient)
         assert client.provider_name == "llama"
 
     def test_create_unknown_raises(self, config_dir: Path) -> None:
