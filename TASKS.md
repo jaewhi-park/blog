@@ -16,64 +16,65 @@
 
 ### M1.1 프로젝트 초기화
 
-- [ ] GitHub 레포지토리 생성 (`whi-blog`)
-- [ ] 기본 디렉토리 구조 생성 (`core/`, `ui/`, `config/`, `templates/`, `references/`, `data/`, `scripts/`, `tests/`)
-- [ ] `requirements.txt` 작성
-- [ ] `.gitignore` 작성 (.env, __pycache__, hugo-site/public/, data/ 등)
-- [ ] `.env.example` 작성 (ANTHROPIC_API_KEY, OPENAI_API_KEY, FRED_API_KEY, GITHUB_TOKEN)
-- [ ] `README.md` 초안 작성
+- [x] GitHub 레포지토리 생성 (`whi-blog`)
+- [x] 기본 디렉토리 구조 생성 (`core/`, `ui/`, `config/`, `templates/`, `references/`, `data/`, `scripts/`, `tests/`)
+- [x] `requirements.txt` 작성
+- [x] `.gitignore` 작성 (.env, __pycache__, hugo-site/public/, data/ 등)
+- [x] `.env.example` 작성 (ANTHROPIC_API_KEY, OPENAI_API_KEY, FRED_API_KEY, GITHUB_TOKEN)
+- [x] `README.md` 초안 작성
 
 ### M1.2 Hugo 사이트 설정
 
-- [ ] Hugo 프로젝트 초기화 (`hugo-site/`)
-- [ ] Hugo Book 테마 git submodule 추가 (`themes/hugo-book`)
-- [ ] `config.toml` 작성
-  - [ ] 기본 설정 (baseURL, languageCode, title)
-  - [ ] Book 테마 파라미터 설정
-  - [ ] KaTeX 수식 렌더링 설정 (goldmark passthrough delimiters)
-  - [ ] markup unsafe 설정
+- [x] Hugo 프로젝트 초기화 (`hugo-site/`)
+- [x] Hugo Book 테마 git submodule 추가 (`themes/hugo-book`)
+- [x] `hugo.toml` 작성 (Hugo v0.110+ 기본 파일명)
+  - [x] 기본 설정 (baseURL, languageCode, title)
+  - [x] Book 테마 파라미터 설정
+  - [x] KaTeX 수식 렌더링 설정 (goldmark passthrough delimiters)
+  - [x] markup unsafe 설정
 
 ### M1.3 계층형 카테고리 구조
 
-- [ ] Hugo content 디렉토리 계층 구조 설계
-- [ ] 카테고리별 `_index.md` 템플릿 정의 (weight, title, bookCollapseSection)
-- [ ] 샘플 카테고리 생성 (math > probability, investment, ai)
+- [x] Hugo content 디렉토리 계층 구조 설계
+- [x] 카테고리별 `_index.md` 템플릿 정의 (weight, title, bookCollapseSection)
+- [x] 샘플 카테고리 생성 (math > probability > random-matrix-theory, math > algebra, investment > macro-analysis, ai > ml-engineering)
 
 ### M1.4 Giscus 댓글 연동
 
-- [ ] GitHub Discussions 활성화
-- [ ] Giscus 앱 설치 및 설정
-- [ ] `config.toml`에 Giscus 파라미터 추가
-- [ ] Hugo Book 테마 댓글 레이아웃 오버라이드 (필요 시)
+- [ ] GitHub Discussions 활성화 *(GitHub 웹에서 수동 설정 필요)*
+- [ ] Giscus 앱 설치 및 설정 *(giscus.app에서 repoId, categoryId 발급 필요)*
+- [x] `hugo.toml`에 Giscus 파라미터 추가
+- [x] Hugo Book 테마 댓글 레이아웃 오버라이드 (`layouts/_partials/docs/comments.html`)
 
 ### M1.5 면책 조항 기반 설정
 
-- [ ] `config/disclaimer.yaml` 작성 (llm_generated, llm_assisted 문구 및 스타일)
-- [ ] Hugo shortcode 작성 (`layouts/shortcodes/disclaimer.html`)
-- [ ] 면책 조항 CSS 스타일링 (warning, info, note)
+- [x] `config/disclaimer.yaml` 작성 (llm_generated, llm_assisted 문구 및 스타일)
+- [x] Hugo shortcode 작성 (`layouts/shortcodes/disclaimer.html`)
+- [x] 면책 조항 CSS 스타일링 (warning, info, note + 다크모드)
 
 ### M1.6 샘플 게시글
 
-- [ ] 수식 포함 샘플 게시글 작성 (KaTeX 검증)
-- [ ] 이미지 포함 샘플 게시글 작성
-- [ ] 면책 조항 포함 샘플 게시글 작성
-- [ ] 다단계 카테고리 배치 확인
+- [x] 수식 포함 샘플 게시글 작성 (KaTeX 검증) — `wigner-semicircle.md`, `free-probability-intro.md`, `linear-algebra-basics.md`
+- [-] 이미지 포함 샘플 게시글 작성 — M2.4 ImageManager 구현 후 추가
+- [x] 면책 조항 포함 샘플 게시글 작성 — llm_generated(warning), llm_assisted(info) 2종
+- [x] 다단계 카테고리 배치 확인 — 4개 게시글, 3단계 계층 검증 완료
+- [x] 랜딩페이지 추가 — About + CV(주석) + Recent Posts 목록
 
 ### M1.7 CI/CD
 
-- [ ] `.github/workflows/deploy.yml` 작성
-  - [ ] checkout with submodules
-  - [ ] Hugo 설치 (extended)
-  - [ ] hugo --minify 빌드
-  - [ ] GitHub Pages 배포 (peaceiris/actions-gh-pages)
-- [ ] GitHub Pages 설정 (Settings > Pages > Source: GitHub Actions)
-- [ ] 배포 검증 — 샘플 게시글이 정상 렌더링되는지 확인
+- [x] `.github/workflows/deploy.yml` 작성
+  - [x] checkout with submodules
+  - [x] Hugo 설치 (extended)
+  - [x] hugo --minify 빌드
+  - [x] GitHub Pages 배포 (actions/deploy-pages@v4, 공식 방식으로 변경)
+- [ ] GitHub Pages 설정 *(Settings > Pages > Source: GitHub Actions 수동 설정 필요)*
+- [ ] 배포 검증 — 샘플 게시글이 정상 렌더링되는지 확인 *(push 후 수동 확인)*
 
 ### M1.8 보안 설정
 
-- [ ] `.pre-commit-config.yaml` 작성 (detect-secrets, ruff)
-- [ ] `.secrets.baseline` 초기화
-- [ ] pre-commit 설치 및 테스트
+- [x] `.pre-commit-config.yaml` 작성 (detect-secrets v1.5.0, ruff v0.15.2)
+- [x] `.secrets.baseline` 초기화 (PRD.md false positive 마킹 완료)
+- [x] pre-commit 설치 및 테스트 — 전체 통과
 
 ---
 
