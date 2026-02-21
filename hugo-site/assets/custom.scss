@@ -1,4 +1,6 @@
+// ===========================
 // Disclaimer styles
+// ===========================
 .disclaimer {
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
@@ -25,19 +27,128 @@
   color: #495057;
 }
 
-// Landing page post list
-.book-post-item {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #eee;
+// ===========================
+// Post card grid
+// ===========================
+.post-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
 
-  h3 {
-    font-size: 1.1rem;
-    font-weight: 600;
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
   }
 }
 
-// Dark mode support
-@media (prefers-color-scheme: dark) {
+.post-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s, border-color 0.2s;
+
+  &:hover {
+    border-color: #aaa;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.post-card-meta {
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 0.4rem;
+}
+
+.post-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.post-card-summary {
+  font-size: 0.85rem;
+  color: #555;
+  margin: 0 0 0.6rem 0;
+  flex-grow: 1;
+  line-height: 1.5;
+}
+
+.post-card-tags {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.post-card-tag {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  background-color: #f0f0f0;
+  color: #555;
+}
+
+// ===========================
+// Theme toggle button
+// ===========================
+.theme-toggle {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s, border-color 0.2s;
+
+  .icon-moon {
+    display: none;
+  }
+}
+
+// ===========================
+// Theme override via data-theme attribute (toggle support)
+// ===========================
+[data-theme="light"] {
+  --body-background: white;
+  --body-background-tint: none;
+  --body-font-color: black;
+  --color-link: #0055bb;
+  --color-visited-link: #5500bb;
+  --icon-filter: none;
+  --gray-100: #f8f9fa;
+  --gray-200: #e9ecef;
+  --gray-500: #adb5bd;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --body-background: #343a40;
+  --body-background-tint: none;
+  --body-font-color: #e9ecef;
+  --color-link: #84b2ff;
+  --color-visited-link: #b88dff;
+  --icon-filter: brightness(0) invert(1);
+  --gray-100: #494e54;
+  --gray-200: #5c6165;
+  --gray-500: #999d9f;
+  color-scheme: dark;
+}
+
+// ===========================
+// Dark mode — component styles
+// ===========================
+[data-theme="dark"] {
   .disclaimer-warning {
     background-color: #332701;
     border-left-color: #ffc107;
@@ -56,11 +167,39 @@
     color: #adb5bd;
   }
 
-  .book-post-item {
-    border-bottom-color: #333;
+  .post-card {
+    border-color: #495057;
 
-    p {
-      color: #adb5bd !important;
+    &:hover {
+      border-color: #6c757d;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  .post-card-meta {
+    color: #999;
+  }
+
+  .post-card-summary {
+    color: #adb5bd;
+  }
+
+  .post-card-tag {
+    background-color: #495057;
+    color: #dee2e6;
+  }
+
+  .theme-toggle {
+    background: #495057;
+    border-color: #6c757d;
+    color: #f8f9fa;
+
+    .icon-sun {
+      display: none;
+    }
+
+    .icon-moon {
+      display: block;
     }
   }
 }
