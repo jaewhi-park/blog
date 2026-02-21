@@ -9,6 +9,7 @@ from core.content.image_manager import (
     ImageManager,
     _sanitize_filename,
     get_base_path,
+    remove_markdown_image_ref,
 )
 
 
@@ -201,3 +202,39 @@ class TestDeleteImage:
         mgr = ImageManager(tmp_path)
         with pytest.raises(FileNotFoundError):
             mgr.delete_image("my-post", "nonexistent.png")
+
+
+class TestRemoveMarkdownImageRef:
+    def test_remove_basic_ref(self) -> None:
+        content = "Hello\n\n![img](/images/my-post/fig.png)\n\nWorld"
+        result = remove_markdown_image_ref(content, "my-post", "fig.png")
+        assert "fig.png" not in result
+        assert "Hello" in result
+        assert "World" in result
+
+    def test_remove_ref_with_base_path(self) -> None:
+        content = "Before\n\n![diagram](/blog/images/my-post/dia.png)\n\nAfter"
+        result = remove_markdown_image_ref(
+            content, "my-post", "dia.png", base_path="/blog"
+        )
+        assert "dia.png" not in result
+        assert "Before" in result
+        assert "After" in result
+
+    def test_remove_ref_with_caption(self) -> None:
+        content = "Text\n\n![Figure 1: Overview](/images/my-post/fig1.png)\n\nMore"
+        result = remove_markdown_image_ref(content, "my-post", "fig1.png")
+        assert "fig1.png" not in result
+        assert "Figure 1" not in result
+
+    def test_remove_nonexistent_ref(self) -> None:
+        content = "Hello\n\n![img](/images/my-post/fig.png)\n\nWorld"
+        result = remove_markdown_image_ref(content, "my-post", "other.png")
+        assert result == content
+
+    def test_remove_collapses_blank_lines(self) -> None:
+        content = "Line1\n\n\n![img](/images/my-post/fig.png)\n\n\nLine2"
+        result = remove_markdown_image_ref(content, "my-post", "fig.png")
+        assert "\n\n\n" not in result
+        assert "Line1" in result
+        assert "Line2" in result

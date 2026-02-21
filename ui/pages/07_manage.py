@@ -15,7 +15,11 @@ import streamlit as st  # noqa: E402
 from core.content.category_manager import CategoryManager  # noqa: E402
 import shutil  # noqa: E402  # isort: skip
 
-from core.content.image_manager import ImageManager, get_base_path  # noqa: E402
+from core.content.image_manager import (  # noqa: E402
+    ImageManager,
+    get_base_path,
+    remove_markdown_image_ref,
+)
 from core.content.markdown_generator import PostMetadata, slugify  # noqa: E402
 from core.content.post_manager import PostManager  # noqa: E402
 from core.exceptions import GitError  # noqa: E402
@@ -156,11 +160,102 @@ st.divider()
 
 # ── 에디터 ──────────────────────────────────────────────
 st.markdown("#### 에디터")
+
+# 이미지 삭제 시 수정된 본문을 반영하기 위한 키 관리
+_editor_version = st.session_state.get("_manage_editor_version", 0)
+_editor_key = f"manage_editor_{_post_key}_{_editor_version}"
+
+# 이미지 삭제로 본문이 갱신된 경우 해당 값을 사용
+_initial_body = st.session_state.pop("_manage_updated_body", body)
+
 edit_content = markdown_editor(
-    key=f"manage_editor_{_post_key}",
+    key=_editor_key,
     height=500,
-    initial_value=body,
+    initial_value=_initial_body,
 )
+
+# ── 이미지 관리 ──────────────────────────────────────────
+post_slug = slugify(edit_title) if edit_title else ""
+images = img_mgr.list_images(post_slug) if post_slug else []
+
+with st.expander(f"이미지 관리 ({len(images)}개)"):
+    if images:
+        cols = st.columns(3)
+        for idx, img_info in enumerate(images):
+            with cols[idx % 3]:
+                img_path = HUGO_STATIC / "images" / post_slug / img_info.filename
+                if img_path.suffix.lower() == ".svg":
+                    st.markdown(f"`{img_info.filename}`")
+                else:
+                    st.image(
+                        str(img_path),
+                        caption=img_info.filename,
+                        use_container_width=True,
+                    )
+                if st.button(
+                    "삭제",
+                    key=f"img_del_{post_slug}_{img_info.filename}",
+                ):
+                    # 이미지 파일 삭제
+                    img_mgr.delete_image(post_slug, img_info.filename)
+
+                    # 에디터 본문에서 이미지 참조 제거
+                    updated_body = remove_markdown_image_ref(
+                        edit_content,
+                        post_slug,
+                        img_info.filename,
+                        base_path=get_base_path(HUGO_SITE),
+                    )
+                    st.session_state["_manage_updated_body"] = updated_body
+                    st.session_state["_manage_editor_version"] = _editor_version + 1
+
+                    # 마크다운 파일도 갱신 저장
+                    post_mgr.save_post(selected_post.file_path, metadata, updated_body)
+
+                    # git commit & push
+                    commit_files = [
+                        selected_post.file_path,
+                        HUGO_STATIC / "images" / post_slug / img_info.filename,
+                    ]
+                    try:
+                        sha = git_mgr.commit_and_push(
+                            f"image: delete {img_info.filename}",
+                            commit_files,
+                            push=True,
+                        )
+                        st.success(f"이미지 삭제 완료 — Git push (commit: `{sha}`)")
+                    except GitError as e:
+                        st.warning(f"Git 연동 실패 (이미지는 삭제됨): {e}")
+                    st.rerun()
+    else:
+        st.caption("첨부된 이미지가 없습니다.")
+
+    # 이미지 업로드
+    uploaded = st.file_uploader(
+        "이미지 업로드",
+        type=["png", "jpg", "jpeg", "gif", "svg", "webp"],
+        key=f"manage_img_upload_{_post_key}",
+    )
+    if uploaded is not None and post_slug:
+        image_data = uploaded.getvalue()
+        info = img_mgr.save_image(image_data, post_slug, uploaded.name)
+        md_ref = img_mgr.generate_markdown_ref(post_slug, info)
+
+        st.success(f"이미지 저장됨: `{info.filename}`")
+        st.caption("아래 참조를 에디터에 붙여넣으세요:")
+        st.code(md_ref, language="markdown")
+
+        # git commit & push
+        img_file = HUGO_STATIC / "images" / post_slug / info.filename
+        try:
+            sha = git_mgr.commit_and_push(
+                f"image: add {info.filename}",
+                [img_file],
+                push=True,
+            )
+            st.success(f"Git push 완료 (commit: `{sha}`)")
+        except GitError as e:
+            st.warning(f"Git 연동 실패 (이미지는 저장됨): {e}")
 
 # ── 액션 버튼 ──────────────────────────────────────────
 col_a1, col_a2, col_a3 = st.columns([1, 1, 1])

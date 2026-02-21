@@ -192,6 +192,31 @@ class ImageManager:
         return True
 
 
+def remove_markdown_image_ref(
+    content: str, post_slug: str, filename: str, base_path: str = ""
+) -> str:
+    """본문에서 특정 이미지의 마크다운 참조를 제거한다.
+
+    패턴: ![any alt text]({base_path}/images/{post_slug}/{filename})
+    제거 후 빈 줄이 연속되면 하나로 합침.
+
+    Args:
+        content: 마크다운 본문.
+        post_slug: 게시글 슬러그.
+        filename: 삭제할 이미지 파일명.
+        base_path: baseURL 경로 접두사 (예: "/blog").
+
+    Returns:
+        이미지 참조가 제거된 본문.
+    """
+    escaped_path = re.escape(f"{base_path}/images/{post_slug}/{filename}")
+    pattern = rf"!\[[^\]]*\]\({escaped_path}\)\n?"
+    result = re.sub(pattern, "", content)
+    # 연속 빈 줄을 하나로 합침
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result
+
+
 def _sanitize_filename(filename: str) -> str:
     """파일명을 URL-safe하게 변환한다.
 
