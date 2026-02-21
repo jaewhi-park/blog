@@ -13,7 +13,8 @@ if _PROJECT_ROOT not in sys.path:
 import streamlit as st  # noqa: E402
 
 from core.content.category_manager import CategoryManager  # noqa: E402
-from core.content.markdown_generator import PostMetadata  # noqa: E402
+from core.content.image_manager import ImageManager, get_base_path  # noqa: E402
+from core.content.markdown_generator import PostMetadata, slugify  # noqa: E402
 from core.content.post_manager import PostManager  # noqa: E402
 from core.exceptions import GitError  # noqa: E402
 from core.publishing.git_manager import GitManager  # noqa: E402
@@ -26,8 +27,10 @@ st.set_page_config(page_title="글 관리 | whi-blog", layout="wide")
 PROJECT_ROOT = Path(_PROJECT_ROOT)
 HUGO_SITE = PROJECT_ROOT / "hugo-site"
 HUGO_CONTENT = HUGO_SITE / "content"
+HUGO_STATIC = HUGO_SITE / "static"
 post_mgr = PostManager(HUGO_CONTENT)
 git_mgr = GitManager(PROJECT_ROOT)
+img_mgr = ImageManager(HUGO_STATIC, base_path=get_base_path(HUGO_SITE))
 
 # ── 카테고리 목록 로드 ──────────────────────────────────────
 cat_mgr = CategoryManager(HUGO_CONTENT)
@@ -198,10 +201,12 @@ if save_clicked:
     rel_path = selected_post.file_path.relative_to(PROJECT_ROOT)
     st.success(f"파일 저장됨: `{rel_path}`")
 
+    post_slug = slugify(edit_title) if edit_title else "untitled"
+    commit_files = [selected_post.file_path] + img_mgr.get_image_paths(post_slug)
     try:
         sha = git_mgr.commit_and_push(
             f"edit: {edit_title}",
-            [selected_post.file_path],
+            commit_files,
             push=True,
         )
         st.success(f"Git push 완료 (commit: `{sha}`)")

@@ -13,6 +13,7 @@ if _PROJECT_ROOT not in sys.path:
 import streamlit as st  # noqa: E402
 
 from core.content.category_manager import CategoryManager  # noqa: E402
+from core.content.image_manager import ImageManager, get_base_path  # noqa: E402
 from core.content.markdown_generator import MarkdownGenerator, PostMetadata, slugify  # noqa: E402
 from core.exceptions import ConfigError, GitError, HugoError, LLMError  # noqa: E402
 from core.publishing.git_manager import GitManager  # noqa: E402
@@ -35,6 +36,7 @@ HUGO_CONTENT = HUGO_SITE / "content"
 HUGO_STATIC = HUGO_SITE / "static"
 git_mgr = GitManager(PROJECT_ROOT)
 hugo_builder = HugoBuilder(HUGO_SITE)
+img_mgr = ImageManager(HUGO_STATIC, base_path=get_base_path(HUGO_SITE))
 
 # ── 카테고리 목록 로드 ──────────────────────────────────────
 cat_mgr = CategoryManager(HUGO_CONTENT)
@@ -147,11 +149,13 @@ if mode == "직접 작성":
             rel_path = file_path.relative_to(PROJECT_ROOT)
             st.success(f"파일 저장됨: `{rel_path}`")
 
-            # Git commit + push
+            # Git commit + push (이미지 포함)
+            post_slug = slugify(title) if title else "untitled"
+            commit_files = [file_path] + img_mgr.get_image_paths(post_slug)
             try:
                 sha = git_mgr.commit_and_push(
                     f"post: {title}",
-                    [file_path],
+                    commit_files,
                     push=True,
                 )
                 st.success(f"Git push 완료 (commit: `{sha}`)")
@@ -336,8 +340,10 @@ elif mode == "페어 라이팅":
         file_path = gen.save(meta, content, HUGO_CONTENT, selected_category_path)
         rel_path = file_path.relative_to(PROJECT_ROOT)
         st.success(f"파일 저장됨: `{rel_path}`")
+        post_slug = slugify(title) if title else "untitled"
+        commit_files = [file_path] + img_mgr.get_image_paths(post_slug)
         try:
-            sha = git_mgr.commit_and_push(f"post: {title}", [file_path], push=True)
+            sha = git_mgr.commit_and_push(f"post: {title}", commit_files, push=True)
             st.success(f"Git push 완료 (commit: `{sha}`)")
         except GitError as e:
             st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
@@ -601,8 +607,10 @@ elif mode == "자동 생성":
             file_path = gen.save(meta, edited, HUGO_CONTENT, selected_category_path)
             rel_path = file_path.relative_to(PROJECT_ROOT)
             st.success(f"파일 저장됨: `{rel_path}`")
+            post_slug = slugify(title) if title else "untitled"
+            commit_files = [file_path] + img_mgr.get_image_paths(post_slug)
             try:
-                sha = git_mgr.commit_and_push(f"post: {title}", [file_path], push=True)
+                sha = git_mgr.commit_and_push(f"post: {title}", commit_files, push=True)
                 st.success(f"Git push 완료 (commit: `{sha}`)")
             except GitError as e:
                 st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")

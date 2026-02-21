@@ -144,6 +144,26 @@ class ImageManager:
                 images.append(ImageInfo(filename=file.name, source="upload"))
         return images
 
+    def get_image_paths(self, post_slug: str) -> list[Path]:
+        """게시글에 저장된 이미지 파일의 절대 경로 목록을 반환한다.
+
+        Args:
+            post_slug: 게시글 슬러그.
+
+        Returns:
+            이미지 파일 Path 목록.
+        """
+        dir_path = self._static_path / "images" / post_slug
+        if not dir_path.exists():
+            return []
+
+        return [
+            f
+            for f in sorted(dir_path.iterdir())
+            if f.is_file()
+            and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+        ]
+
     def delete_image(self, post_slug: str, filename: str) -> bool:
         """
         이미지를 삭제한다.
