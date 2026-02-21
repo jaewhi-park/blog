@@ -4,7 +4,28 @@ from pathlib import Path
 
 import pytest
 
-from core.content.image_manager import ImageInfo, ImageManager, get_base_path
+from core.content.image_manager import (
+    ImageInfo,
+    ImageManager,
+    _sanitize_filename,
+    get_base_path,
+)
+
+
+class TestSanitizeFilename:
+    def test_spaces_replaced(self) -> None:
+        assert _sanitize_filename("my file.png") == "my-file.png"
+
+    def test_korean_with_spaces(self) -> None:
+        result = _sanitize_filename("스크린샷 2026-02-21 오후 9.30.27.png")
+        assert " " not in result
+        assert result == "스크린샷-2026-02-21-오후-9-30-27.png"
+
+    def test_preserves_extension(self) -> None:
+        assert _sanitize_filename("Photo.JPG") == "Photo.jpg"
+
+    def test_already_safe(self) -> None:
+        assert _sanitize_filename("diagram.png") == "diagram.png"
 
 
 class TestSaveImage:
@@ -15,6 +36,13 @@ class TestSaveImage:
         assert (tmp_path / "images" / "my-post" / "diagram.png").exists()
         assert info.filename == "diagram.png"
         assert info.source == "upload"
+
+    def test_save_sanitizes_filename(self, tmp_path: Path) -> None:
+        mgr = ImageManager(tmp_path)
+        info = mgr.save_image(b"data", "my-post", "my photo.png")
+
+        assert info.filename == "my-photo.png"
+        assert (tmp_path / "images" / "my-post" / "my-photo.png").exists()
 
     def test_save_preserves_data(self, tmp_path: Path) -> None:
         data = b"\x89PNG\r\nfake image data"

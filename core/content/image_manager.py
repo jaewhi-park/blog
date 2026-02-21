@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import tomllib
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -86,14 +88,16 @@ class ImageManager:
         if not image_data:
             raise ValueError("이미지 데이터가 비어있습니다.")
 
+        safe_filename = _sanitize_filename(filename)
+
         dir_path = self._static_path / "images" / post_slug
         dir_path.mkdir(parents=True, exist_ok=True)
 
-        file_path = dir_path / filename
+        file_path = dir_path / safe_filename
         file_path.write_bytes(image_data)
 
         return ImageInfo(
-            filename=filename,
+            filename=safe_filename,
             source=source,
             caption=caption,
         )
@@ -166,3 +170,27 @@ class ImageManager:
             dir_path.rmdir()
 
         return True
+
+
+def _sanitize_filename(filename: str) -> str:
+    """파일명을 URL-safe하게 변환한다.
+
+    공백·특수문자를 하이픈으로 치환하고, 확장자는 보존한다.
+    한글은 그대로 유지한다.
+
+    예: "스크린샷 2026-02-21 오후 9.30.27.png" → "스크린샷-2026-02-21-오후-9-30-27.png"
+    """
+    stem = Path(filename).stem
+    suffix = Path(filename).suffix.lower()
+
+    text = unicodedata.normalize("NFC", stem)
+    # 한글, 영문, 숫자, 하이픈 외의 문자를 하이픈으로 치환
+    text = re.sub(r"[^\w-]", "-", text)
+    # 연속 하이픈 제거
+    text = re.sub(r"-+", "-", text)
+    text = text.strip("-")
+
+    if not text:
+        text = "image"
+
+    return f"{text}{suffix}"
