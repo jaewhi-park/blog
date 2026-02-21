@@ -21,6 +21,7 @@ from core.llm.base import LLMRequest  # noqa: E402
 from core.llm.factory import LLMFactory  # noqa: E402
 from ui.components.editor import image_upload_insert, markdown_editor  # noqa: E402
 from ui.components.llm_selector import llm_selector  # noqa: E402
+from ui.components.image_picker import image_picker  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
 from ui.components.source_input import source_input  # noqa: E402
 
@@ -395,6 +396,19 @@ elif mode == "자동 생성":
             md_ref = image_upload_insert(post_slug=post_slug, key="auto_img")
             if md_ref:
                 st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
+
+        # PDF 추출 이미지 선택
+        source_images = st.session_state.get("auto_source_images", [])
+        source_image_data = st.session_state.get("auto_source_image_data", {})
+        if source_images:
+            with st.expander("소스 추출 이미지", expanded=False):
+                post_slug = slugify(title) if title else "untitled"
+                image_picker(
+                    source_images,
+                    source_image_data,
+                    post_slug=post_slug,
+                    key_prefix="auto_img_picker",
+                )
 
         st.divider()
 
