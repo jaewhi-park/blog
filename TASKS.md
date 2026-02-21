@@ -287,75 +287,75 @@
 
 ### M4.1 PDF 파서
 
-- [ ] `core/sources/pdf_parser.py` 구현
-  - [ ] `parse()` — PyMuPDF로 텍스트 추출
-  - [ ] 페이지 범위 지정 (page_range 파라미터)
-  - [ ] 이미지 추출 (extract_images 파라미터)
-  - [ ] `PDFContent` dataclass (text, images, total_pages, extracted_range)
-- [ ] 단위 테스트 (샘플 PDF)
+- [x] `core/sources/pdf_parser.py` 구현
+  - [x] `parse()` — PyMuPDF로 텍스트 추출
+  - [x] 페이지 범위 지정 (page_range 파라미터)
+  - [x] 이미지 추출 (extract_images 파라미터)
+  - [x] `PDFContent` dataclass (text, images, image_data, total_pages, extracted_range)
+- [x] 단위 테스트 (14개, PyMuPDF로 테스트 PDF 동적 생성)
 
 ### M4.2 URL 크롤러
 
-- [ ] `core/sources/url_crawler.py` 구현
-  - [ ] `crawl()` — httpx + BeautifulSoup4 비동기 크롤링
-  - [ ] HTML 본문 텍스트 추출 (nav, footer, ads 제거)
-  - [ ] `CrawledContent` dataclass
-- [ ] 단위 테스트
+- [x] `core/sources/url_crawler.py` 구현
+  - [x] `crawl()` — httpx + BeautifulSoup4 비동기 크롤링
+  - [x] HTML 본문 텍스트 추출 (nav, footer, ads 제거)
+  - [x] `CrawledContent` dataclass
+- [x] 단위 테스트 (17개)
 
 ### M4.3 arxiv 클라이언트
 
-- [ ] `core/sources/arxiv_client.py` 구현
-  - [ ] `fetch_recent()` — 카테고리별 최신 논문 조회
-  - [ ] `fetch_by_id()` — 특정 논문 조회
-  - [ ] `download_pdf()` — PDF 다운로드
-  - [ ] `ArxivPaper` dataclass
-- [ ] 단위 테스트
+- [x] `core/sources/arxiv_client.py` 구현
+  - [x] `fetch_recent()` — 카테고리별 최신 논문 조회
+  - [x] `fetch_by_id()` — 특정 논문 조회
+  - [x] `download_pdf()` — PDF 다운로드
+  - [x] `ArxivPaper` dataclass
+- [x] 단위 테스트 (12개)
 
 ### M4.4 소스 어그리게이터
 
-- [ ] `core/sources/aggregator.py` 구현
-  - [ ] `SourceInput` dataclass (source_type, path_or_url, page_range, label)
-  - [ ] `AggregatedContent` dataclass (combined_text, sources, images, total_tokens_estimate)
-  - [ ] `aggregate()` — 복수 소스 파싱/크롤링 → 구분자 포함 병합
-- [ ] 단위 테스트
+- [x] `core/sources/aggregator.py` 구현
+  - [x] `SourceInput` dataclass (source_type, path_or_url, page_range, label)
+  - [x] `AggregatedContent` dataclass (combined_text, sources, images, image_data, total_tokens_estimate)
+  - [x] `aggregate()` — 복수 소스 파싱/크롤링 → 구분자 포함 병합 (부분 실패 허용)
+- [x] 단위 테스트 (13개)
 
 ### M4.5 청킹 엔진
 
-- [ ] `core/llm/chunking.py` 구현
-  - [ ] `ChunkingConfig` dataclass
-  - [ ] `needs_chunking()` — 토큰 카운팅 기반 판단
-  - [ ] `split_chunks()` — 청크 분할 (의미 단위 경계 고려)
-  - [ ] `map_reduce()` — Map(병렬) + Reduce 파이프라인
-- [ ] Map 단계 경량 모델, Reduce 단계 고성능 모델 설정 적용
-- [ ] 단위 테스트 (`tests/unit/test_chunking.py`)
+- [x] `core/llm/chunking.py` 구현
+  - [x] `ChunkingConfig` dataclass
+  - [x] `needs_chunking()` — 토큰 카운팅 기반 판단
+  - [x] `split_chunks()` — 청크 분할 (헤딩 → 문단 → 줄바꿈 → 공백 경계 우선)
+  - [x] `map_reduce()` — Map(병렬) + Reduce 파이프라인
+- [x] Map 단계 경량 모델, Reduce 단계 고성능 모델 설정 적용
+- [x] 단위 테스트 (`tests/unit/test_chunking.py`, 16개)
 
 ### M4.6 Streamlit — 소스 입력 UI
 
-- [ ] `ui/components/source_input.py` — 소스 입력 컴포넌트
-  - [ ] [+ PDF] [+ URL] [+ arxiv] 버튼
-  - [ ] 소스 목록 표시 (파일명/URL, 범위, 삭제 버튼)
-  - [ ] PDF 업로드 + 페이지 범위 지정
-  - [ ] URL 입력
-  - [ ] arxiv ID/URL 입력
-- [ ] 자동 생성 모드에 소스 입력 컴포넌트 연동
+- [x] `ui/components/source_input.py` — 소스 입력 컴포넌트
+  - [x] [+ PDF] [+ URL] [+ arxiv] 버튼
+  - [x] 소스 목록 표시 (파일명/URL, 범위, 삭제 버튼)
+  - [x] PDF 업로드 + 페이지 범위 지정
+  - [x] URL 입력
+  - [x] arxiv ID/URL 입력
+- [x] 자동 생성 모드에 소스 입력 컴포넌트 연동
 
 ### M4.7 Streamlit — PDF 이미지 선택
 
-- [ ] `ui/components/image_picker.py` — 이미지 선택 컴포넌트
-  - [ ] PDF 추출 이미지 썸네일 표시
-  - [ ] 체크박스로 게시글에 포함할 이미지 선택
-  - [ ] 선택된 이미지 캡션 입력
-- [ ] 이미지 매니저 연동 (Hugo static 저장)
+- [x] `ui/components/image_picker.py` — 이미지 선택 컴포넌트
+  - [x] PDF 추출 이미지 썸네일 표시
+  - [x] 체크박스로 게시글에 포함할 이미지 선택
+  - [x] 선택된 이미지 캡션 입력
+- [x] 이미지 매니저 연동 (Hugo static 저장)
 
 ### M4.8 파이프라인 통합
 
-- [ ] `core/pipeline.py` 구현
-  - [ ] `WriteRequest` dataclass
-  - [ ] `WriteResult` dataclass
-  - [ ] `ContentPipeline.execute()` — 소스 처리 → 옵션 조립 → LLM 호출 → 후처리
-  - [ ] `ContentPipeline.get_feedback()` — 페어 라이팅 피드백
-- [ ] 토큰 카운팅 → 자동 분기 (직접 호출 / Map-Reduce) 연동
-- [ ] 통합 테스트 (`tests/integration/test_pipeline.py`)
+- [x] `core/pipeline.py` 구현
+  - [x] `WriteRequest` dataclass
+  - [x] `WriteResult` dataclass
+  - [x] `ContentPipeline.execute()` — 소스 처리 → 옵션 조립 → LLM 호출 → 후처리
+  - [x] `ContentPipeline.get_feedback()` — 페어 라이팅 피드백
+- [x] 토큰 카운팅 → 자동 분기 (직접 호출 / Map-Reduce) 연동
+- [x] 통합 테스트 (`tests/integration/test_pipeline.py`, 15개)
 
 ---
 
