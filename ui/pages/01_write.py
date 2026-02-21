@@ -15,6 +15,7 @@ import streamlit as st  # noqa: E402
 from core.content.category_manager import CategoryManager  # noqa: E402
 from core.content.markdown_generator import MarkdownGenerator, PostMetadata, _slugify  # noqa: E402
 from core.publishing.git_manager import GitError, GitManager  # noqa: E402
+from core.publishing.hugo_builder import HugoBuilder, HugoError  # noqa: E402
 from ui.components.editor import image_upload_insert, markdown_editor  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
 
@@ -22,9 +23,11 @@ st.set_page_config(page_title="글 작성 | whi-blog", layout="wide")
 
 # ── 경로 설정 ──────────────────────────────────────────────
 PROJECT_ROOT = Path(_PROJECT_ROOT)
-HUGO_CONTENT = Path("hugo-site/content")
-HUGO_STATIC = Path("hugo-site/static")
+HUGO_SITE = Path("hugo-site")
+HUGO_CONTENT = HUGO_SITE / "content"
+HUGO_STATIC = HUGO_SITE / "static"
 git_mgr = GitManager(PROJECT_ROOT)
+hugo_builder = HugoBuilder(HUGO_SITE)
 
 # ── 카테고리 목록 로드 ──────────────────────────────────────
 cat_mgr = CategoryManager(HUGO_CONTENT)
@@ -112,8 +115,9 @@ if mode == "직접 작성":
         if st.button("임시저장", disabled=True):
             pass  # M2.8에서 구현
     with col_a2:
-        if st.button("미리보기 (Hugo)", disabled=True):
-            pass  # M2.9에서 구현
+        hugo_preview_clicked = st.button(
+            "미리보기 (Hugo)", disabled=not content.strip()
+        )
     with col_a3:
         preview_clicked = st.button("미리보기")
 
@@ -154,6 +158,29 @@ if mode == "직접 작성":
 
     if preview_clicked:
         _show_preview()
+
+    # Hugo 로컬 미리보기
+    if hugo_preview_clicked:
+        try:
+            # 임시 저장 후 Hugo 서버로 미리보기
+            post_slug = _slugify(title) if title else "preview"
+            tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+            categories = [selected_category_path] if selected_category_path else []
+            meta = PostMetadata(
+                title=title or "Preview",
+                categories=categories,
+                tags=tags,
+                draft=True,
+                math=use_math,
+            )
+            gen = MarkdownGenerator()
+            file_path = gen.save(meta, content, HUGO_CONTENT, selected_category_path)
+
+            hugo_builder.serve()
+            url = hugo_builder.get_preview_url(file_path)
+            st.markdown(f"Hugo 서버에서 미리보기: [{url}]({url})")
+        except HugoError as e:
+            st.error(f"Hugo 서버 실행 실패: {e}")
 
 # ── 페어 라이팅 모드 ────────────────────────────────────────
 elif mode == "페어 라이팅":
