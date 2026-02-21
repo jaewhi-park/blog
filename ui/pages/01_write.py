@@ -16,7 +16,11 @@ from core.content.category_manager import CategoryManager  # noqa: E402
 from core.content.markdown_generator import MarkdownGenerator, PostMetadata, _slugify  # noqa: E402
 from core.publishing.git_manager import GitError, GitManager  # noqa: E402
 from core.publishing.hugo_builder import HugoBuilder, HugoError  # noqa: E402
+from core.llm.base import LLMRequest  # noqa: E402
+from core.llm.factory import LLMFactory  # noqa: E402
+from core.exceptions import LLMError, ConfigError  # noqa: E402
 from ui.components.editor import image_upload_insert, markdown_editor  # noqa: E402
+from ui.components.llm_selector import llm_selector  # noqa: E402
 from ui.components.preview import markdown_preview  # noqa: E402
 
 st.set_page_config(page_title="글 작성 | whi-blog", layout="wide")
@@ -184,8 +188,6 @@ if mode == "직접 작성":
 
 # ── 페어 라이팅 모드 ────────────────────────────────────────
 elif mode == "페어 라이팅":
-    st.info("M3에서 LLM 연동 후 활성화됩니다.")
-
     st.markdown("#### 에디터")
     content = markdown_editor(
         key="pair_editor",
@@ -193,17 +195,13 @@ elif mode == "페어 라이팅":
         placeholder="초안을 작성하면 LLM이 피드백을 제공합니다...",
     )
 
-    col_llm1, col_llm2 = st.columns(2)
-    with col_llm1:
-        st.selectbox("프로바이더", ["Claude", "OpenAI", "Llama"], disabled=True)
-    with col_llm2:
-        st.selectbox("모델", ["Sonnet", "Haiku"], disabled=True)
+    provider, model = llm_selector(key_prefix="pair")
 
-    col_p1, col_p2 = st.columns([1, 3])
+    col_p1, col_p2, col_p3 = st.columns([1, 1, 2])
     with col_p1:
         pair_preview = st.button("미리보기", key="pair_preview_btn")
     with col_p2:
-        st.button("LLM 피드백 요청", disabled=True)
+        feedback_clicked = st.button("LLM 피드백 요청", disabled=not content.strip())
 
     @st.dialog("미리보기", width="large")
     def _show_pair_preview() -> None:
@@ -212,9 +210,37 @@ elif mode == "페어 라이팅":
     if pair_preview:
         _show_pair_preview()
 
+    # LLM 피드백
+    if feedback_clicked:
+        import asyncio
+
+        try:
+            client = LLMFactory.create(provider)
+            request = LLMRequest(
+                system_prompt=(
+                    "당신은 기술 블로그 글 작성을 돕는 편집자입니다. "
+                    "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
+                    "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
+                ),
+                user_prompt=f"다음 초안에 대한 피드백을 제공해주세요:\n\n{content}",
+                model=model,
+            )
+            with st.spinner("LLM 피드백 생성 중..."):
+                response = asyncio.run(client.generate(request))
+
+            st.markdown("#### LLM 피드백")
+            st.markdown(response.content)
+            st.caption(
+                f"모델: {response.model} | "
+                f"토큰: {response.usage.get('input_tokens', 0)} in / "
+                f"{response.usage.get('output_tokens', 0)} out"
+            )
+        except (ConfigError, LLMError) as e:
+            st.error(f"LLM 호출 실패: {e}")
+
 # ── 자동 생성 모드 ──────────────────────────────────────────
 elif mode == "자동 생성":
-    st.info("M4에서 소스 연동 후 활성화됩니다.")
+    st.caption("소스 입력은 M4에서 추가됩니다.")
 
     prompt = st.text_area(
         "주제 / 지시사항",
@@ -223,15 +249,83 @@ elif mode == "자동 생성":
         label_visibility="collapsed",
     )
 
-    col_llm1, col_llm2 = st.columns(2)
-    with col_llm1:
-        st.selectbox(
-            "프로바이더",
-            ["Claude", "OpenAI", "Llama"],
-            key="auto_provider",
-            disabled=True,
-        )
-    with col_llm2:
-        st.selectbox("모델", ["Sonnet", "Haiku"], key="auto_model", disabled=True)
+    provider, model = llm_selector(key_prefix="auto")
 
-    st.button("생성 요청", type="primary", disabled=True)
+    if st.button("생성 요청", type="primary", disabled=not prompt.strip()):
+        import asyncio
+
+        try:
+            client = LLMFactory.create(provider)
+            request = LLMRequest(
+                system_prompt=(
+                    "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+                    "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+                    "영어 수학/기술 용어는 그대로 유지하세요. "
+                    "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+                    "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+                ),
+                user_prompt=prompt,
+                model=model,
+            )
+            with st.spinner("글 생성 중..."):
+                response = asyncio.run(client.generate(request))
+
+            st.session_state["auto_generated_content"] = response.content
+            st.session_state["auto_generated_model"] = response.model
+            st.caption(
+                f"모델: {response.model} | "
+                f"토큰: {response.usage.get('input_tokens', 0)} in / "
+                f"{response.usage.get('output_tokens', 0)} out"
+            )
+        except (ConfigError, LLMError) as e:
+            st.error(f"LLM 호출 실패: {e}")
+
+    # 생성된 초안 편집 + 게시
+    if "auto_generated_content" in st.session_state:
+        st.markdown("#### 생성된 초안 (편집 가능)")
+        edited = markdown_editor(
+            key="auto_editor",
+            height=500,
+            initial_value=st.session_state["auto_generated_content"],
+        )
+
+        col_auto1, col_auto2 = st.columns([1, 3])
+        with col_auto1:
+            auto_preview = st.button("미리보기", key="auto_preview_btn")
+        with col_auto2:
+            auto_publish_disabled = not title or not edited.strip()
+            if st.button(
+                "게시하기",
+                type="primary",
+                key="auto_publish",
+                disabled=auto_publish_disabled,
+            ):
+                tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+                categories = [selected_category_path] if selected_category_path else []
+                meta = PostMetadata(
+                    title=title,
+                    categories=categories,
+                    tags=tags,
+                    draft=is_draft,
+                    math=use_math,
+                    llm_generated=True,
+                    llm_model=st.session_state.get("auto_generated_model", model),
+                )
+                gen = MarkdownGenerator()
+                file_path = gen.save(meta, edited, HUGO_CONTENT, selected_category_path)
+                rel_path = file_path.relative_to(PROJECT_ROOT)
+                st.success(f"파일 저장됨: `{rel_path}`")
+                try:
+                    sha = git_mgr.commit_and_push(
+                        f"post: {title}", [file_path], push=True
+                    )
+                    st.success(f"Git push 완료 (commit: `{sha}`)")
+                except GitError as e:
+                    st.warning(f"Git 연동 실패 (파일은 저장됨): {e}")
+
+        @st.dialog("미리보기", width="large")
+        def _show_auto_preview() -> None:
+            markdown_preview(edited, title=title, height=600)
+
+        if auto_preview:
+            _show_auto_preview()

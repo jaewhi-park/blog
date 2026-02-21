@@ -1,0 +1,36 @@
+providers:
+  claude:
+    default_model: "claude-sonnet-4-20250514"
+    api_key_env: "ANTHROPIC_API_KEY"  # pragma: allowlist secret
+    models:
+      - id: "claude-sonnet-4-20250514"
+        name: "Claude Sonnet 4"
+        max_context_tokens: 200000
+      - id: "claude-haiku-4-5-20251001"
+        name: "Claude Haiku 4.5"
+        max_context_tokens: 200000
+
+  openai:
+    default_model: "gpt-4o"
+    api_key_env: "OPENAI_API_KEY"  # pragma: allowlist secret
+    models:
+      - id: "gpt-4o"
+        name: "GPT-4o"
+        max_context_tokens: 128000
+      - id: "gpt-4o-mini"
+        name: "GPT-4o Mini"
+        max_context_tokens: 128000
+
+  llama:
+    default_model: "llama3.1"
+    endpoint: "http://localhost:11434"
+    models:
+      - id: "llama3.1"
+        name: "Llama 3.1"
+        max_context_tokens: 128000
+
+chunking:
+  chunk_size_tokens: 4000
+  context_threshold: 0.7
+  map_model: "claude-haiku-4-5-20251001"
+  reduce_model: "claude-sonnet-4-20250514"
