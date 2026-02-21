@@ -6,9 +6,7 @@ import subprocess
 import time
 from pathlib import Path
 
-
-class HugoError(Exception):
-    """Hugo 명령 실행 실패."""
+from core.exceptions import HugoError
 
 
 class HugoBuilder:

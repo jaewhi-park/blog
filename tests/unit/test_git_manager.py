@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from core.publishing.git_manager import GitError, GitManager
+from core.exceptions import GitError
+from core.publishing.git_manager import GitManager
 
 
 def _init_repo(tmp_path: Path) -> GitManager:

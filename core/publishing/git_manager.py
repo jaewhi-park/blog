@@ -5,9 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
-class GitError(Exception):
-    """Git 명령 실행 실패."""
+from core.exceptions import GitError
 
 
 class GitManager:

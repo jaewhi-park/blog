@@ -31,3 +31,11 @@ class SourceError(WhiBlogError):
 
 class PublishError(WhiBlogError):
     """게시 파이프라인 에러."""
+
+
+class GitError(PublishError):
+    """Git 명령 실행 실패."""
+
+
+class HugoError(PublishError):
+    """Hugo 명령 실행 실패."""
