@@ -11,28 +11,40 @@ from dotenv import load_dotenv
 
 from core.exceptions import ConfigError
 
+# 프로젝트 루트 (core/ 의 부모 디렉토리)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# load_dotenv는 모듈 로드 시 1회만 실행
+load_dotenv()
+
 
 class Config:
     """YAML 설정 파일과 환경변수를 통합 관리한다."""
 
-    def __init__(self, config_dir: Path = Path("config")) -> None:
+    def __init__(self, config_dir: Path | None = None) -> None:
         """
         Args:
-            config_dir: 설정 파일 디렉토리 경로.
+            config_dir: 설정 파일 디렉토리 경로. None이면 프로젝트 루트의 config/.
         """
-        load_dotenv()
-        self._config_dir = config_dir
+        self._config_dir = config_dir or (_PROJECT_ROOT / "config")
         self.llm: dict[str, Any] = self._load_yaml("llm_config.yaml")
         self.arxiv: dict[str, Any] = self._load_yaml("arxiv_digest.yaml")
         self.disclaimer: dict[str, Any] = self._load_yaml("disclaimer.yaml")
 
     def _load_yaml(self, filename: str) -> dict[str, Any]:
-        """YAML 파일을 로드한다."""
+        """YAML 파일을 로드한다.
+
+        Raises:
+            ConfigError: YAML 파싱에 실패한 경우.
+        """
         path = self._config_dir / filename
         if not path.exists():
             return {}
-        with open(path, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            raise ConfigError(f"YAML 파싱 실패 ({filename}): {e}") from e
 
     @staticmethod
     def get_api_key(env_var: str) -> str:
@@ -50,9 +62,9 @@ class Config:
             API 키 문자열.
 
         Raises:
-            ConfigError: 환경변수가 설정되지 않은 경우.
+            ConfigError: 환경변수가 설정되지 않았거나 빈 문자열인 경우.
         """
-        value = os.environ.get(env_var)
+        value = os.environ.get(env_var, "").strip()
         if not value:
             raise ConfigError(
                 f"API 키가 설정되지 않았습니다: {env_var}\n"

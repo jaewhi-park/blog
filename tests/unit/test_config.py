@@ -74,6 +74,20 @@ class TestConfig:
         with pytest.raises(ConfigError, match="API 키가 설정되지 않았습니다"):
             Config.get_api_key("MISSING_KEY")
 
+    def test_get_api_key_empty_string_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("EMPTY_KEY", "")
+        with pytest.raises(ConfigError, match="API 키가 설정되지 않았습니다"):
+            Config.get_api_key("EMPTY_KEY")
+
+    def test_get_api_key_whitespace_only_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SPACE_KEY", "   ")
+        with pytest.raises(ConfigError, match="API 키가 설정되지 않았습니다"):
+            Config.get_api_key("SPACE_KEY")
+
     def test_get_chunking_config(self, config_dir: Path) -> None:
         cfg = Config(config_dir=config_dir)
         chunking = cfg.get_chunking_config()
@@ -88,3 +102,13 @@ class TestConfig:
         (tmp_path / "llm_config.yaml").write_text("", encoding="utf-8")
         cfg = Config(config_dir=tmp_path)
         assert cfg.llm == {}
+
+    def test_invalid_yaml_raises(self, tmp_path: Path) -> None:
+        (tmp_path / "llm_config.yaml").write_text("{{invalid yaml", encoding="utf-8")
+        with pytest.raises(ConfigError, match="YAML 파싱 실패"):
+            Config(config_dir=tmp_path)
+
+    def test_default_config_dir_is_project_root(self) -> None:
+        cfg = Config()
+        assert cfg._config_dir.is_absolute()
+        assert cfg._config_dir.name == "config"
