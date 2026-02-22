@@ -47,3 +47,11 @@ class TemplateError(WhiBlogError):
 
 class TemplateNotFoundError(TemplateError):
     """템플릿을 찾을 수 없음."""
+
+
+class ReferenceError(WhiBlogError):
+    """스타일 레퍼런스 관련 에러."""
+
+
+class ReferenceNotFoundError(ReferenceError):
+    """스타일 레퍼런스를 찾을 수 없음."""

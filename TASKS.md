@@ -426,12 +426,15 @@
 
 ### M5.3 스타일 레퍼런스 매니저
 
-- [ ] `core/content/reference_manager.py` 구현
-  - [ ] `StyleReference` dataclass (id, name, source_type, source_path, content_cache)
-  - [ ] `list_all()`, `add_file()`, `add_url()`, `remove()`, `get_content()`
-  - [ ] `references/index.yaml` 메타데이터 관리
-  - [ ] URL 레퍼런스 크롤링 + 캐시 저장
-- [ ] 단위 테스트
+- [x] `core/content/reference_manager.py` 구현
+  - [x] `StyleReference` dataclass (id, name, source_type, source_path, content_cache, file_type, created_at, updated_at)
+  - [x] `list_all()`, `get()`, `add_file()`, `add_url()`, `remove()`, `get_content()`
+  - [x] `references/index.yaml` 메타데이터 관리
+  - [x] URL 레퍼런스 크롤링 (URLCrawler 재사용) + content_cache 저장
+  - [x] PDF 레퍼런스 텍스트 추출 (PDFParser 재사용)
+- [x] `core/exceptions.py`에 `ReferenceError`, `ReferenceNotFoundError` 추가
+- [x] `core/content/__init__.py`에 `ReferenceManager`, `StyleReference` export 추가
+- [x] 단위 테스트 (`tests/unit/test_reference_manager.py`) — 26개 통과
 
 ### M5.4 Streamlit — 템플릿 관리 페이지
 
