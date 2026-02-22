@@ -446,12 +446,12 @@
 
 ### M5.5 Streamlit — 스타일 레퍼런스 관리 페이지
 
-- [ ] `ui/pages/04_references.py`
-  - [ ] 레퍼런스 목록 표시 (이름, 타입, 소스)
-  - [ ] 파일 레퍼런스 추가 (PDF, MD, TXT 업로드)
-  - [ ] URL 레퍼런스 추가
-  - [ ] 레퍼런스 삭제
-  - [ ] 레퍼런스 내용 미리보기
+- [x] `ui/pages/04_references.py`
+  - [x] 레퍼런스 목록 표시 (이름, 타입, 소스 — expander)
+  - [x] 파일 레퍼런스 추가 (PDF, MD, TXT 업로드 → tempfile 경유 → add_file)
+  - [x] URL 레퍼런스 추가 (크롤링 spinner 표시)
+  - [x] 레퍼런스 삭제
+  - [x] 레퍼런스 내용 미리보기 (expander 내 최대 2,000자)
 
 ### M5.6 글 작성 연동
 
