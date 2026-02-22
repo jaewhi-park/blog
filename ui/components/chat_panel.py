@@ -10,6 +10,7 @@ def chat_panel(
     key_prefix: str,
     input_placeholder: str = "메시지를 입력하세요...",
     height: int = 400,
+    show_apply_button: bool = False,
 ) -> str | None:
     """대화 이력을 표시하고 새 메시지 입력을 받는다.
 
@@ -19,6 +20,8 @@ def chat_panel(
         key_prefix: Streamlit 위젯 key 프리픽스 (충돌 방지).
         input_placeholder: 입력 필드 placeholder 텍스트.
         height: 대화 이력 컨테이너 높이(px).
+        show_apply_button: True일 때 assistant 메시지 하단에
+            "에디터에 반영" 버튼을 표시한다.
 
     Returns:
         새 메시지 텍스트. 입력이 없으면 None.
@@ -32,7 +35,10 @@ def chat_panel(
             with st.chat_message(role):
                 st.markdown(msg["content"])
                 if role == "assistant":
-                    footer_cols = st.columns([1, 1, 10])
+                    if show_apply_button:
+                        footer_cols = st.columns([1, 1, 1, 9])
+                    else:
+                        footer_cols = st.columns([1, 1, 10])
                     with footer_cols[0]:
                         with st.popover("📋", help="복사"):
                             st.code(
@@ -47,6 +53,18 @@ def chat_panel(
                                 f"{usage.get('input_tokens', 0)}↑ "
                                 f"{usage.get('output_tokens', 0)}↓"
                             )
+                    if show_apply_button:
+                        apply_col = 2
+                        with footer_cols[apply_col]:
+                            if st.button(
+                                "반영",
+                                key=f"{key_prefix}_apply_{idx}",
+                                help="에디터에 반영",
+                            ):
+                                st.session_state[f"{key_prefix}_apply_content"] = msg[
+                                    "content"
+                                ]
+                                st.rerun()
 
     # 메시지 입력
     new_message = st.text_area(

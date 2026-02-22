@@ -52,6 +52,20 @@ def _flatten_categories(cats: list, prefix: str = "") -> list[tuple[str, str]]:
     return result
 
 
+def _build_system_prompt(
+    base_prompt: str,
+    editor_content: str | None = None,
+    source_text: str | None = None,
+) -> str:
+    """시스템 프롬프트에 소스 자료와 현재 초안을 추가한다."""
+    parts = [base_prompt]
+    if source_text:
+        parts.append(f"\n\n## 참고 소스 자료\n\n{source_text}")
+    if editor_content:
+        parts.append(f"\n\n## 현재 초안\n\n{editor_content}")
+    return "".join(parts)
+
+
 flat_cats = _flatten_categories(cat_mgr.list_all())
 
 # ── 헤더 ────────────────────────────────────────────────────
@@ -201,6 +215,12 @@ elif mode == "페어 라이팅":
 
     provider, model = llm_selector(key_prefix="pair")
 
+    # 소스 입력
+    with st.expander("소스 자료 (PDF, URL, arXiv)", expanded=False):
+        pair_sources = source_input(key_prefix="pair_source")
+        if pair_sources:
+            st.caption(f"{len(pair_sources)}개 소스 등록됨")
+
     col_editor, col_chat = st.columns([1, 1])
 
     with col_editor:
@@ -218,6 +238,19 @@ elif mode == "페어 라이팅":
             if md_ref:
                 st.info("위 마크다운 참조를 에디터 본문에 붙여넣으세요.")
 
+        # 소스 추출 이미지 선택
+        source_images = st.session_state.get("pair_source_images", [])
+        source_image_data = st.session_state.get("pair_source_image_data", {})
+        if source_images:
+            with st.expander("소스 추출 이미지", expanded=False):
+                post_slug = slugify(title) if title else "untitled"
+                image_picker(
+                    source_images,
+                    source_image_data,
+                    post_slug=post_slug,
+                    key_prefix="pair_img_picker",
+                )
+
     with col_chat:
         st.markdown("#### LLM 대화")
         include_draft = st.checkbox(
@@ -233,23 +266,49 @@ elif mode == "페어 라이팅":
         if new_msg:
             import asyncio
 
-            # 초안 포함 옵션
-            user_content = new_msg
-            if include_draft and content and content.strip():
-                user_content = f"{new_msg}\n\n---\n현재 초안:\n\n{content}"
+            from core.exceptions import SourceError  # noqa: E402
+            from core.sources.aggregator import SourceAggregator  # noqa: E402
+            from core.sources.arxiv_client import ArxivClient  # noqa: E402
+            from core.sources.pdf_parser import PDFParser  # noqa: E402
+            from core.sources.url_crawler import URLCrawler  # noqa: E402
 
+            # 소스 자료 수집 (첫 메시지에서만)
+            if pair_sources and "pair_source_text" not in st.session_state:
+                try:
+                    aggregator = SourceAggregator(
+                        PDFParser(), URLCrawler(), ArxivClient()
+                    )
+                    with st.spinner("소스 자료 수집 중..."):
+                        aggregated = asyncio.run(aggregator.aggregate(pair_sources))
+                    st.session_state["pair_source_text"] = aggregated.combined_text
+                    st.session_state["pair_source_images"] = aggregated.images
+                    st.session_state["pair_source_image_data"] = aggregated.image_data
+                except SourceError as e:
+                    st.error(f"소스 수집 실패: {e}")
+
+            # user 메시지는 순수 사용자 입력만 저장
             st.session_state["pair_chat_messages"].append(
-                {"role": "user", "content": user_content}
+                {"role": "user", "content": new_msg}
+            )
+
+            # system prompt에 에디터 내용과 소스 자료 포함
+            base_prompt = (
+                "당신은 기술 블로그 글 작성을 돕는 편집자입니다. "
+                "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
+                "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
+            )
+            editor_content = (
+                content if include_draft and content and content.strip() else None
+            )
+            source_text = st.session_state.get("pair_source_text")
+            system_prompt = _build_system_prompt(
+                base_prompt, editor_content, source_text
             )
 
             try:
                 client = LLMFactory.create(provider)
                 request = LLMRequest(
-                    system_prompt=(
-                        "당신은 기술 블로그 글 작성을 돕는 편집자입니다. "
-                        "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
-                        "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
-                    ),
+                    system_prompt=system_prompt,
                     user_prompt="",
                     messages=[
                         {"role": m["role"], "content": m["content"]}
@@ -294,6 +353,12 @@ elif mode == "페어 라이팅":
     with col_p4:
         if st.button("대화 초기화", key="pair_reset_chat"):
             st.session_state["pair_chat_messages"] = []
+            for key in [
+                "pair_source_text",
+                "pair_source_images",
+                "pair_source_image_data",
+            ]:
+                st.session_state.pop(key, None)
             st.rerun()
 
     @st.dialog("미리보기", width="large")
@@ -447,6 +512,13 @@ elif mode == "자동 생성":
         provider = st.session_state.get("auto_saved_provider", "claude")
         model = st.session_state.get("auto_saved_model", None)
 
+        # "에디터에 반영" 버튼 처리
+        apply_key = "auto_apply_content"
+        if apply_key in st.session_state:
+            st.session_state["auto_generated_content"] = st.session_state.pop(apply_key)
+            st.session_state["auto_editor_version"] += 1
+            st.rerun()
+
         col_editor, col_chat = st.columns([1, 1])
 
         with col_editor:
@@ -488,30 +560,34 @@ elif mode == "자동 생성":
                 key_prefix="auto",
                 input_placeholder="수정 요청을 입력하세요...",
                 height=400,
+                show_apply_button=True,
             )
 
             if new_msg:
                 import asyncio
 
-                # 에디터 내용 포함 옵션
-                user_content = new_msg
-                if include_current and edited and edited.strip():
-                    user_content = f"{new_msg}\n\n---\n현재 초안:\n\n{edited}"
-
+                # user 메시지는 순수 사용자 입력만 저장
                 st.session_state["auto_chat_messages"].append(
-                    {"role": "user", "content": user_content}
+                    {"role": "user", "content": new_msg}
                 )
+
+                # system prompt에 에디터 내용 포함
+                base_prompt = (
+                    "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+                    "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+                    "영어 수학/기술 용어는 그대로 유지하세요. "
+                    "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+                    "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+                )
+                editor_content = (
+                    edited if include_current and edited and edited.strip() else None
+                )
+                system_prompt = _build_system_prompt(base_prompt, editor_content)
 
                 try:
                     client = LLMFactory.create(provider)
                     request = LLMRequest(
-                        system_prompt=(
-                            "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
-                            "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
-                            "영어 수학/기술 용어는 그대로 유지하세요. "
-                            "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
-                            "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
-                        ),
+                        system_prompt=system_prompt,
                         user_prompt="",
                         messages=[
                             {"role": m["role"], "content": m["content"]}
@@ -529,9 +605,6 @@ elif mode == "자동 생성":
                             "usage": response.usage,
                         }
                     )
-                    # 에디터 내용 갱신
-                    st.session_state["auto_generated_content"] = response.content
-                    st.session_state["auto_editor_version"] += 1
                     st.rerun()
                 except (ConfigError, LLMError) as e:
                     st.error(f"LLM 호출 실패: {e}")
