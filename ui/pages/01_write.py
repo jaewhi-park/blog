@@ -72,6 +72,28 @@ def _build_system_prompt(
     return "".join(parts)
 
 
+def _show_prompt_debug(session_key: str) -> None:
+    """session_state에 저장된 프롬프트 정보를 디버그 expander로 표시한다."""
+    prompt_info = st.session_state.get(session_key)
+    if not prompt_info:
+        return
+    with st.expander("전송된 프롬프트 확인", expanded=False):
+        st.markdown("**System Prompt**")
+        st.code(prompt_info["system_prompt"], language=None)
+        if prompt_info.get("user_prompt"):
+            st.markdown("**User Prompt**")
+            st.code(prompt_info["user_prompt"], language=None)
+        if prompt_info.get("messages"):
+            st.markdown("**Messages**")
+            for msg in prompt_info["messages"]:
+                role_label = "User" if msg["role"] == "user" else "Assistant"
+                st.markdown(f"**{role_label}:**")
+                content_preview = msg["content"]
+                if len(content_preview) > 2000:
+                    content_preview = content_preview[:2000] + "\n\n... (truncated)"
+                st.code(content_preview, language=None)
+
+
 flat_cats = _flatten_categories(cat_mgr.list_all())
 
 # ── 헤더 ────────────────────────────────────────────────────
@@ -349,14 +371,19 @@ elif mode == "페어 라이팅":
             )
 
             try:
+                pair_messages = [
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state["pair_chat_messages"]
+                ]
+                st.session_state["pair_last_prompt"] = {
+                    "system_prompt": system_prompt,
+                    "messages": pair_messages,
+                }
                 client = LLMFactory.create(provider)
                 request = LLMRequest(
                     system_prompt=system_prompt,
                     user_prompt="",
-                    messages=[
-                        {"role": m["role"], "content": m["content"]}
-                        for m in st.session_state["pair_chat_messages"]
-                    ],
+                    messages=pair_messages,
                     model=model,
                 )
                 with st.spinner("LLM 응답 생성 중..."):
@@ -376,6 +403,9 @@ elif mode == "페어 라이팅":
                 st.session_state["pair_chat_messages"].pop()
 
     st.divider()
+
+    # 프롬프트 디버그
+    _show_prompt_debug("pair_last_prompt")
 
     # 액션 버튼
     col_p1, col_p2, col_p3, col_p4 = st.columns([1, 1, 1, 1])
@@ -400,6 +430,7 @@ elif mode == "페어 라이팅":
                 "pair_source_text",
                 "pair_source_images",
                 "pair_source_image_data",
+                "pair_last_prompt",
             ]:
                 st.session_state.pop(key, None)
             st.rerun()
@@ -536,6 +567,10 @@ elif mode == "자동 생성":
                         style_reference=ref_text,
                     )
 
+                st.session_state["auto_last_prompt"] = {
+                    "system_prompt": auto_system_prompt,
+                    "user_prompt": auto_user_prompt,
+                }
                 client = LLMFactory.create(provider)
                 request = LLMRequest(
                     system_prompt=auto_system_prompt,
@@ -655,14 +690,19 @@ elif mode == "자동 생성":
                 system_prompt = _build_system_prompt(base_prompt, editor_content)
 
                 try:
+                    auto_messages = [
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state["auto_chat_messages"]
+                    ]
+                    st.session_state["auto_last_prompt"] = {
+                        "system_prompt": system_prompt,
+                        "messages": auto_messages,
+                    }
                     client = LLMFactory.create(provider)
                     request = LLMRequest(
                         system_prompt=system_prompt,
                         user_prompt="",
-                        messages=[
-                            {"role": m["role"], "content": m["content"]}
-                            for m in st.session_state["auto_chat_messages"]
-                        ],
+                        messages=auto_messages,
                         model=model,
                     )
                     with st.spinner("LLM 응답 생성 중..."):
@@ -681,6 +721,9 @@ elif mode == "자동 생성":
                     st.session_state["auto_chat_messages"].pop()
 
         st.divider()
+
+        # 프롬프트 디버그
+        _show_prompt_debug("auto_last_prompt")
 
         # 액션 버튼
         col_auto1, col_auto2, col_auto3, col_auto4 = st.columns([1, 1, 1, 1])
@@ -703,6 +746,7 @@ elif mode == "자동 생성":
                 st.session_state["auto_chat_messages"] = []
                 st.session_state["auto_generated_content"] = ""
                 st.session_state["auto_editor_version"] = 0
+                st.session_state.pop("auto_last_prompt", None)
                 st.rerun()
 
         @st.dialog("미리보기", width="large")
@@ -767,5 +811,6 @@ elif mode == "자동 생성":
                 "auto_saved_template_id",
                 "auto_saved_reference_id",
                 "auto_editor_version",
+                "auto_last_prompt",
             ]:
                 st.session_state.pop(key, None)
