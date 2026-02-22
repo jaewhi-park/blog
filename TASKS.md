@@ -418,11 +418,11 @@
 
 ### M5.2 기본 템플릿 세트
 
-- [ ] `templates/summary.yaml` — 요약 템플릿
-- [ ] `templates/column.yaml` — 칼럼/오피니언 템플릿
-- [ ] `templates/lecture_note.yaml` — 렉쳐노트 템플릿
-- [ ] `templates/paper_review.yaml` — 논문 리뷰 템플릿
-- [ ] `templates/data_report.yaml` — 데이터 분석 리포트 템플릿
+- [x] `templates/summary.yaml` — 요약 템플릿
+- [x] `templates/column.yaml` — 칼럼/오피니언 템플릿
+- [x] `templates/lecture_note.yaml` — 렉쳐노트 템플릿
+- [x] `templates/paper_review.yaml` — 논문 리뷰 템플릿
+- [x] `templates/data_report.yaml` — 데이터 분석 리포트 템플릿
 
 ### M5.3 스타일 레퍼런스 매니저
 

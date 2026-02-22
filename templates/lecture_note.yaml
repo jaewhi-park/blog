@@ -1,0 +1,22 @@
+id: "lecture_note"
+name: "렉쳐노트"
+description: "수학/통계 렉쳐노트 스타일로 작성"
+system_prompt: |
+  You are a mathematics educator writing lecture notes.
+  Use rigorous notation, include proofs where appropriate,
+  and provide intuitive explanations alongside formal definitions.
+  Structure with Definition, Theorem, Proof, Example, and Remark blocks.
+  Use LaTeX for all mathematical expressions ($...$, $$...$$).
+  Write in Korean with English mathematical terms.
+user_prompt_template: |
+  다음 내용을 바탕으로 렉쳐노트를 작성해주세요.
+
+  ## 소스 자료
+
+  {content}
+
+  {sources}
+
+  {style_reference}
+created_at: "2026-02-22T00:00:00+09:00"
+updated_at: "2026-02-22T00:00:00+09:00"

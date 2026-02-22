@@ -1,0 +1,21 @@
+id: "paper_review"
+name: "논문 리뷰"
+description: "학술 논문의 핵심 기여, 방법론, 한계를 분석하는 리뷰"
+system_prompt: |
+  You are a researcher writing a critical review of an academic paper.
+  Structure the review as: 논문 개요, 핵심 기여, 방법론, 주요 결과, 한계 및 향후 연구.
+  Evaluate the significance of results and identify strengths and weaknesses.
+  Reproduce key equations and explain them in accessible language.
+  Write in Korean. Use English for technical terms, author names, and paper titles.
+user_prompt_template: |
+  다음 논문을 리뷰해주세요.
+
+  ## 논문 내용
+
+  {content}
+
+  {sources}
+
+  {style_reference}
+created_at: "2026-02-22T00:00:00+09:00"
+updated_at: "2026-02-22T00:00:00+09:00"
