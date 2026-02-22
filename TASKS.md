@@ -438,11 +438,11 @@
 
 ### M5.4 Streamlit — 템플릿 관리 페이지
 
-- [ ] `ui/pages/03_templates.py`
-  - [ ] 템플릿 목록 표시
-  - [ ] 템플릿 생성 폼 (이름, 설명, system_prompt, user_prompt_template)
-  - [ ] 템플릿 편집
-  - [ ] 템플릿 삭제
+- [x] `ui/pages/03_templates.py`
+  - [x] 템플릿 목록 표시 (expander로 system_prompt, user_prompt_template 확인)
+  - [x] 템플릿 생성 폼 (이름, 설명, system_prompt, user_prompt_template)
+  - [x] 템플릿 편집 (selectbox 선택 → form으로 수정)
+  - [x] 템플릿 삭제
 
 ### M5.5 Streamlit — 스타일 레퍼런스 관리 페이지
 
