@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -129,7 +130,8 @@ class TemplateManager:
         """템플릿을 렌더링하여 (system_prompt, rendered_user_prompt)를 반환한다.
 
         user_prompt_template의 플레이스홀더를 치환한다.
-        미사용 플레이스홀더는 빈 문자열로 대체된다.
+        미사용 플레이스홀더는 빈 문자열로 대체되고,
+        내용이 없는 ``## 섹션``은 자동 제거된다.
 
         Raises:
             TemplateNotFoundError: 템플릿이 존재하지 않는 경우.
@@ -141,9 +143,22 @@ class TemplateManager:
         placeholders.update(kwargs)
 
         rendered = tpl.user_prompt_template.format_map(placeholders)
+        rendered = self._strip_empty_sections(rendered)
         return (tpl.system_prompt, rendered)
 
     # ── 내부 헬퍼 ──
+
+    @staticmethod
+    def _strip_empty_sections(text: str) -> str:
+        """빈 섹션(## 헤딩 뒤 내용이 없는 섹션)을 제거한다."""
+        result = re.sub(
+            r"^## [^\n]+\n+(?=## |\Z)",
+            "",
+            text,
+            flags=re.MULTILINE,
+        )
+        result = re.sub(r"\n{3,}", "\n\n", result)
+        return result.strip()
 
     def _template_path(self, template_id: str) -> Path:
         """템플릿 id로 파일 경로를 반환한다."""

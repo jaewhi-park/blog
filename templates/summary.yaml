@@ -10,11 +10,17 @@ system_prompt: |
 user_prompt_template: |
   다음 내용을 구조화된 형태로 요약해주세요.
 
-  ## 소스 자료
+  ## 요약할 내용
 
   {content}
 
+  ## 참고 자료
+
   {sources}
+
+  ## 스타일 레퍼런스
+
+  아래 글의 문체와 톤을 참고하여 작성해주세요.
 
   {style_reference}
 created_at: "2026-02-22T00:00:00+09:00"

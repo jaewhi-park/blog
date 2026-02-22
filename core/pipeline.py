@@ -220,6 +220,8 @@ class ContentPipeline:
         """템플릿과 레퍼런스를 해석하여 (system_prompt, user_prompt)를 반환한다.
 
         template_id가 없거나 template_manager가 없으면 None을 반환한다.
+        템플릿 사용 시 sources는 별도 ``{sources}`` 섹션으로 전달하므로,
+        content에는 소스를 포함하지 않는다 (중복 방지).
         """
         if not request.template_id or not self._tpl_mgr:
             return None
@@ -229,8 +231,8 @@ class ContentPipeline:
         if request.reference_id and self._ref_mgr:
             style_reference = self._ref_mgr.get_content(request.reference_id)
 
-        # 렌더링할 content 구성
-        content = self._build_user_prompt(request, source_text)
+        # content에는 소스를 제외 (템플릿이 {sources}로 별도 배치)
+        content = self._build_user_prompt(request, source_text="")
 
         return self._tpl_mgr.render(
             request.template_id,
