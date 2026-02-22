@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
 from core.content.image_manager import ImageInfo
+from core.content.reference_manager import ReferenceManager
+from core.content.template_manager import PromptTemplate, TemplateManager
 from core.llm.base import LLMResponse
 from core.llm.chunking import ChunkingConfig, ChunkingEngine
 from core.pipeline import ContentPipeline, WriteRequest, WriteResult
@@ -331,3 +334,129 @@ class TestMetadata:
         result = await pipeline.execute(request)
 
         assert result.metadata.categories == []
+
+
+class TestTemplateIntegration:
+    """템플릿 + 레퍼런스 연동 통합 테스트."""
+
+    @pytest.fixture
+    def tpl_mgr(self, tmp_path: Path) -> TemplateManager:
+        """tmp_path 기반 TemplateManager를 생성한다."""
+        tpl_dir = tmp_path / "templates"
+        mgr = TemplateManager(tpl_dir)
+        mgr.create(
+            PromptTemplate(
+                id="test-tpl",
+                name="테스트 템플릿",
+                description="테스트용",
+                system_prompt="당신은 논문 리뷰 전문가입니다.",
+                user_prompt_template=(
+                    "다음 내용을 리뷰하세요:\n\n{content}\n\n"
+                    "스타일 참고:\n{style_reference}"
+                ),
+                created_at="",
+                updated_at="",
+            )
+        )
+        return mgr
+
+    @pytest.fixture
+    def ref_mgr(self, tmp_path: Path) -> ReferenceManager:
+        """tmp_path 기반 ReferenceManager를 생성한다."""
+        ref_dir = tmp_path / "references"
+        ref_dir.mkdir(parents=True, exist_ok=True)
+        # 파일 레퍼런스 추가
+        sample = tmp_path / "sample_style.md"
+        sample.write_text("문체 예시: 간결하고 학술적인 톤")
+        mgr = ReferenceManager(ref_dir)
+        mgr.add_file("sample-style", sample)
+        return mgr
+
+    @pytest.fixture
+    def pipeline_with_tpl(
+        self,
+        factory: MagicMock,
+        aggregator: AsyncMock,
+        tpl_mgr: TemplateManager,
+        ref_mgr: ReferenceManager,
+    ) -> ContentPipeline:
+        return ContentPipeline(
+            llm_factory=factory,
+            source_aggregator=aggregator,
+            template_manager=tpl_mgr,
+            reference_manager=ref_mgr,
+        )
+
+    @pytest.mark.asyncio
+    async def test_auto_with_template(
+        self,
+        pipeline_with_tpl: ContentPipeline,
+        client: MagicMock,
+    ) -> None:
+        """template_id 지정 → 템플릿 system_prompt가 LLM에 전달된다."""
+        request = WriteRequest(
+            mode="auto",
+            title="T",
+            prompt="P",
+            template_id="test-tpl",
+        )
+        await pipeline_with_tpl.execute(request)
+
+        call_args = client.generate.call_args[0][0]
+        assert "논문 리뷰 전문가" in call_args.system_prompt
+
+    @pytest.mark.asyncio
+    async def test_auto_with_template_and_reference(
+        self,
+        pipeline_with_tpl: ContentPipeline,
+        client: MagicMock,
+    ) -> None:
+        """template_id + reference_id → style_reference가 rendered prompt에 포함된다."""
+        request = WriteRequest(
+            mode="auto",
+            title="T",
+            prompt="P",
+            template_id="test-tpl",
+            reference_id="sample-style",
+        )
+        await pipeline_with_tpl.execute(request)
+
+        call_args = client.generate.call_args[0][0]
+        assert "논문 리뷰 전문가" in call_args.system_prompt
+        assert "간결하고 학술적인 톤" in call_args.user_prompt
+
+    @pytest.mark.asyncio
+    async def test_auto_without_template_unchanged(
+        self,
+        pipeline_with_tpl: ContentPipeline,
+        client: MagicMock,
+    ) -> None:
+        """template_id 미지정 → 기존 _SYSTEM_PROMPT_AUTO가 사용된다."""
+        request = WriteRequest(
+            mode="auto",
+            title="T",
+            prompt="P",
+        )
+        await pipeline_with_tpl.execute(request)
+
+        call_args = client.generate.call_args[0][0]
+        assert "기술 블로그 글을 작성하는 전문 작가" in call_args.system_prompt
+
+    @pytest.mark.asyncio
+    async def test_pair_with_template(
+        self,
+        pipeline_with_tpl: ContentPipeline,
+        client: MagicMock,
+    ) -> None:
+        """페어 모드에서 template_id → system_prompt에 템플릿 스타일 컨텍스트가 포함된다."""
+        request = WriteRequest(
+            mode="pair",
+            content="초안 내용",
+            title="T",
+            template_id="test-tpl",
+        )
+        await pipeline_with_tpl.get_feedback(request)
+
+        call_args = client.generate.call_args[0][0]
+        assert "편집자" in call_args.system_prompt
+        assert "논문 리뷰 전문가" in call_args.system_prompt

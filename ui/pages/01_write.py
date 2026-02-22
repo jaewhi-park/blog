@@ -15,6 +15,8 @@ import streamlit as st  # noqa: E402
 from core.content.category_manager import CategoryManager  # noqa: E402
 from core.content.image_manager import ImageManager, get_base_path  # noqa: E402
 from core.content.markdown_generator import MarkdownGenerator, PostMetadata, slugify  # noqa: E402
+from core.content.reference_manager import ReferenceManager  # noqa: E402
+from core.content.template_manager import TemplateManager  # noqa: E402
 from core.exceptions import ConfigError, GitError, HugoError, LLMError  # noqa: E402
 from core.publishing.git_manager import GitManager  # noqa: E402
 from core.publishing.hugo_builder import HugoBuilder  # noqa: E402
@@ -40,6 +42,10 @@ img_mgr = ImageManager(HUGO_STATIC, base_path=get_base_path(HUGO_SITE))
 
 # ── 카테고리 목록 로드 ──────────────────────────────────────
 cat_mgr = CategoryManager(HUGO_CONTENT)
+
+# ── 템플릿/레퍼런스 매니저 ─────────────────────────────────
+tpl_mgr = TemplateManager(PROJECT_ROOT / "templates")
+ref_mgr = ReferenceManager(PROJECT_ROOT / "references")
 
 
 def _flatten_categories(cats: list, prefix: str = "") -> list[tuple[str, str]]:
@@ -101,6 +107,35 @@ if flat_cats:
 else:
     st.warning("등록된 카테고리가 없습니다. 카테고리 관리 페이지에서 추가하세요.")
     selected_category_path = ""
+
+# 템플릿/레퍼런스 선택 (LLM 모드에서만)
+selected_template_id: str | None = None
+selected_reference_id: str | None = None
+
+if mode != "직접 작성":
+    col_tpl, col_ref = st.columns(2)
+    with col_tpl:
+        all_templates = tpl_mgr.list_all()
+        tpl_options = ["(없음)"] + [t.name for t in all_templates]
+        tpl_ids: list[str | None] = [None] + [t.id for t in all_templates]
+        tpl_idx = st.selectbox(
+            "프롬프트 템플릿",
+            range(len(tpl_options)),
+            format_func=lambda i: tpl_options[i],
+            key="tpl_select",
+        )
+        selected_template_id = tpl_ids[tpl_idx]
+    with col_ref:
+        all_refs = ref_mgr.list_all()
+        ref_options = ["(없음)"] + [r.name for r in all_refs]
+        ref_ids: list[str | None] = [None] + [r.id for r in all_refs]
+        ref_idx = st.selectbox(
+            "스타일 레퍼런스",
+            range(len(ref_options)),
+            format_func=lambda i: ref_options[i],
+            key="ref_select",
+        )
+        selected_reference_id = ref_ids[ref_idx]
 
 # 면책 조항 옵션 (모드에 따라 자동 설정)
 col_opt1, col_opt2, col_opt3 = st.columns(3)
@@ -297,6 +332,14 @@ elif mode == "페어 라이팅":
                 "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
                 "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
             )
+            # 템플릿 system_prompt로 스타일 컨텍스트 추가
+            if selected_template_id:
+                tpl = tpl_mgr.get(selected_template_id)
+                base_prompt += f"\n\n## 원하는 글 스타일\n\n{tpl.system_prompt}"
+            # 스타일 레퍼런스 추가
+            if selected_reference_id:
+                ref_text = ref_mgr.get_content(selected_reference_id)
+                base_prompt += f"\n\n## 스타일 레퍼런스 예시\n\n{ref_text}"
             editor_content = (
                 content if include_draft and content and content.strip() else None
             )
@@ -472,16 +515,31 @@ elif mode == "자동 생성":
                         f"지시사항: {prompt}"
                     )
 
+                # 템플릿 렌더링
+                auto_system_prompt = (
+                    "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+                    "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+                    "영어 수학/기술 용어는 그대로 유지하세요. "
+                    "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+                    "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+                )
+                auto_user_prompt = user_content
+
+                if selected_template_id:
+                    ref_text = ""
+                    if selected_reference_id:
+                        ref_text = ref_mgr.get_content(selected_reference_id)
+                    auto_system_prompt, auto_user_prompt = tpl_mgr.render(
+                        selected_template_id,
+                        content=user_content,
+                        sources=source_text,
+                        style_reference=ref_text,
+                    )
+
                 client = LLMFactory.create(provider)
                 request = LLMRequest(
-                    system_prompt=(
-                        "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
-                        "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
-                        "영어 수학/기술 용어는 그대로 유지하세요. "
-                        "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
-                        "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
-                    ),
-                    user_prompt=user_content,
+                    system_prompt=auto_system_prompt,
+                    user_prompt=auto_user_prompt,
                     model=model,
                 )
                 with st.spinner("글 생성 중..."):
@@ -491,6 +549,8 @@ elif mode == "자동 생성":
                 st.session_state["auto_generated_model"] = response.model
                 st.session_state["auto_saved_provider"] = provider
                 st.session_state["auto_saved_model"] = model
+                st.session_state["auto_saved_template_id"] = selected_template_id
+                st.session_state["auto_saved_reference_id"] = selected_reference_id
                 st.session_state["auto_editor_version"] = 0
                 # 대화 이력에 첫 턴 기록
                 st.session_state["auto_chat_messages"] = [
@@ -579,6 +639,16 @@ elif mode == "자동 생성":
                     "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
                     "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
                 )
+                # 저장된 템플릿이 있으면 system_prompt 교체
+                saved_tpl_id = st.session_state.get("auto_saved_template_id")
+                if saved_tpl_id:
+                    tpl = tpl_mgr.get(saved_tpl_id)
+                    base_prompt = tpl.system_prompt
+                # 저장된 레퍼런스가 있으면 스타일 컨텍스트 추가
+                saved_ref_id = st.session_state.get("auto_saved_reference_id")
+                if saved_ref_id:
+                    ref_text = ref_mgr.get_content(saved_ref_id)
+                    base_prompt += f"\n\n## 스타일 레퍼런스 예시\n\n{ref_text}"
                 editor_content = (
                     edited if include_current and edited and edited.strip() else None
                 )
@@ -694,6 +764,8 @@ elif mode == "자동 생성":
                 "auto_chat_messages",
                 "auto_saved_provider",
                 "auto_saved_model",
+                "auto_saved_template_id",
+                "auto_saved_reference_id",
                 "auto_editor_version",
             ]:
                 st.session_state.pop(key, None)

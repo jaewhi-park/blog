@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 from core.content.image_manager import ImageInfo, ImageManager
 from core.content.markdown_generator import MarkdownGenerator, PostMetadata
+from core.content.reference_manager import ReferenceManager
+from core.content.template_manager import TemplateManager
 from core.llm.base import LLMClient, LLMRequest
 from core.llm.chunking import ChunkingEngine
 from core.llm.factory import LLMFactory
@@ -75,6 +77,8 @@ class ContentPipeline:
         chunking_engine: ChunkingEngine | None = None,
         markdown_generator: MarkdownGenerator | None = None,
         image_manager: ImageManager | None = None,
+        template_manager: TemplateManager | None = None,
+        reference_manager: ReferenceManager | None = None,
     ) -> None:
         """
         Args:
@@ -83,12 +87,16 @@ class ContentPipeline:
             chunking_engine: 청킹 엔진 (None이면 Map-Reduce 미사용).
             markdown_generator: 마크다운 생성기 (None이면 기본값 사용).
             image_manager: 이미지 매니저 (None이면 이미지 처리 생략).
+            template_manager: 템플릿 매니저 (None이면 템플릿 미사용).
+            reference_manager: 레퍼런스 매니저 (None이면 레퍼런스 미사용).
         """
         self._llm_factory = llm_factory
         self._aggregator = source_aggregator
         self._chunking = chunking_engine
         self._md_gen = markdown_generator or MarkdownGenerator()
         self._image_mgr = image_manager
+        self._tpl_mgr = template_manager
+        self._ref_mgr = reference_manager
 
     async def execute(self, request: WriteRequest) -> WriteResult:
         """
@@ -120,12 +128,21 @@ class ContentPipeline:
             images = aggregated.images
             image_data = aggregated.image_data
 
+        # 템플릿 렌더링
+        resolved = self._resolve_template(request, source_text)
+
+        if resolved:
+            system_prompt, user_prompt = resolved
+        else:
+            system_prompt = _SYSTEM_PROMPT_AUTO
+            user_prompt = self._build_user_prompt(request, source_text)
+
         # LLM 호출
-        user_prompt = self._build_user_prompt(request, source_text)
         content, usage = await self._generate(
             client,
             user_prompt,
             request.model,
+            system_prompt=system_prompt,
         )
 
         metadata = self._build_metadata(request)
@@ -150,8 +167,15 @@ class ContentPipeline:
         """
         client = self._llm_factory.create(request.provider or "claude")
 
+        # 템플릿이 있으면 system_prompt에 스타일 컨텍스트 추가
+        system_prompt = _SYSTEM_PROMPT_FEEDBACK
+        if request.template_id and self._tpl_mgr:
+            tpl = self._tpl_mgr.get(request.template_id)
+            style_context = f"\n\n## 원하는 글 스타일\n\n{tpl.system_prompt}"
+            system_prompt = _SYSTEM_PROMPT_FEEDBACK + style_context
+
         llm_request = LLMRequest(
-            system_prompt=_SYSTEM_PROMPT_FEEDBACK,
+            system_prompt=system_prompt,
             user_prompt=f"다음 초안에 대한 피드백을 제공해주세요:\n\n{request.content}",
             model=request.model,
         )
@@ -190,11 +214,37 @@ class ContentPipeline:
 
         return "\n\n---\n\n".join(parts) if parts else request.title
 
+    def _resolve_template(
+        self, request: WriteRequest, source_text: str
+    ) -> tuple[str, str] | None:
+        """템플릿과 레퍼런스를 해석하여 (system_prompt, user_prompt)를 반환한다.
+
+        template_id가 없거나 template_manager가 없으면 None을 반환한다.
+        """
+        if not request.template_id or not self._tpl_mgr:
+            return None
+
+        # 스타일 레퍼런스 텍스트 획득
+        style_reference = ""
+        if request.reference_id and self._ref_mgr:
+            style_reference = self._ref_mgr.get_content(request.reference_id)
+
+        # 렌더링할 content 구성
+        content = self._build_user_prompt(request, source_text)
+
+        return self._tpl_mgr.render(
+            request.template_id,
+            content=content,
+            sources=source_text,
+            style_reference=style_reference,
+        )
+
     async def _generate(
         self,
         client: LLMClient,
         user_prompt: str,
         model: str | None,
+        system_prompt: str = _SYSTEM_PROMPT_AUTO,
     ) -> tuple[str, dict]:
         """토큰 카운팅 기반으로 직접 호출 또는 Map-Reduce를 수행한다."""
         # Map-Reduce 분기
@@ -208,7 +258,7 @@ class ContentPipeline:
 
         # 직접 호출
         llm_request = LLMRequest(
-            system_prompt=_SYSTEM_PROMPT_AUTO,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
             model=model,
         )
