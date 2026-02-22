@@ -72,20 +72,27 @@ def _build_system_prompt(
     return "".join(parts)
 
 
-def _show_prompt_debug(session_key: str) -> None:
-    """session_state에 저장된 프롬프트 정보를 디버그 expander로 표시한다."""
-    prompt_info = st.session_state.get(session_key)
-    if not prompt_info:
-        return
-    with st.expander("전송된 프롬프트 확인", expanded=False):
+def _show_prompt_preview(
+    system_prompt: str,
+    user_prompt: str | None = None,
+    messages: list[dict] | None = None,
+) -> None:
+    """현재 설정 기반 프롬프트 미리보기를 expander로 표시한다."""
+    with st.expander("프롬프트 미리보기", expanded=False):
         st.markdown("**System Prompt**")
-        st.code(prompt_info["system_prompt"], language=None)
-        if prompt_info.get("user_prompt"):
+        sys_preview = system_prompt
+        if len(sys_preview) > 3000:
+            sys_preview = sys_preview[:3000] + "\n\n... (truncated)"
+        st.code(sys_preview, language=None)
+        if user_prompt:
             st.markdown("**User Prompt**")
-            st.code(prompt_info["user_prompt"], language=None)
-        if prompt_info.get("messages"):
+            usr_preview = user_prompt
+            if len(usr_preview) > 3000:
+                usr_preview = usr_preview[:3000] + "\n\n... (truncated)"
+            st.code(usr_preview, language=None)
+        if messages:
             st.markdown("**Messages**")
-            for msg in prompt_info["messages"]:
+            for msg in messages:
                 role_label = "User" if msg["role"] == "user" else "Assistant"
                 st.markdown(f"**{role_label}:**")
                 content_preview = msg["content"]
@@ -371,19 +378,14 @@ elif mode == "페어 라이팅":
             )
 
             try:
-                pair_messages = [
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state["pair_chat_messages"]
-                ]
-                st.session_state["pair_last_prompt"] = {
-                    "system_prompt": system_prompt,
-                    "messages": pair_messages,
-                }
                 client = LLMFactory.create(provider)
                 request = LLMRequest(
                     system_prompt=system_prompt,
                     user_prompt="",
-                    messages=pair_messages,
+                    messages=[
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state["pair_chat_messages"]
+                    ],
                     model=model,
                 )
                 with st.spinner("LLM 응답 생성 중..."):
@@ -404,8 +406,28 @@ elif mode == "페어 라이팅":
 
     st.divider()
 
-    # 프롬프트 디버그
-    _show_prompt_debug("pair_last_prompt")
+    # 프롬프트 미리보기 (실시간)
+    _pair_base = (
+        "당신은 기술 블로그 글 작성을 돕는 편집자입니다. "
+        "사용자의 초안을 읽고 구조, 논리, 명확성, 기술적 정확성 측면에서 "
+        "개선 피드백을 한국어로 제공하세요. 영어 수학/기술 용어는 그대로 유지하세요."
+    )
+    if selected_template_id:
+        _pair_base += f"\n\n## 원하는 글 스타일\n\n{tpl_mgr.get(selected_template_id).system_prompt}"
+    if selected_reference_id:
+        _pair_base += f"\n\n## 스타일 레퍼런스 예시\n\n{ref_mgr.get_content(selected_reference_id)}"
+    _pair_editor = content if include_draft and content and content.strip() else None
+    _pair_source = st.session_state.get("pair_source_text")
+    _pair_system = _build_system_prompt(_pair_base, _pair_editor, _pair_source)
+    _pair_msgs = (
+        [
+            {"role": m["role"], "content": m["content"]}
+            for m in st.session_state["pair_chat_messages"]
+        ]
+        if st.session_state["pair_chat_messages"]
+        else None
+    )
+    _show_prompt_preview(_pair_system, messages=_pair_msgs)
 
     # 액션 버튼
     col_p1, col_p2, col_p3, col_p4 = st.columns([1, 1, 1, 1])
@@ -430,7 +452,6 @@ elif mode == "페어 라이팅":
                 "pair_source_text",
                 "pair_source_images",
                 "pair_source_image_data",
-                "pair_last_prompt",
             ]:
                 st.session_state.pop(key, None)
             st.rerun()
@@ -514,6 +535,29 @@ elif mode == "자동 생성":
 
         provider, model = llm_selector(key_prefix="auto")
 
+        # 프롬프트 미리보기 (실시간)
+        _auto_pre_system = (
+            "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+            "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+            "영어 수학/기술 용어는 그대로 유지하세요. "
+            "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+            "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+        )
+        _auto_pre_user = prompt.strip() if prompt.strip() else None
+        if selected_template_id and prompt.strip():
+            _ref_text = (
+                ref_mgr.get_content(selected_reference_id)
+                if selected_reference_id
+                else ""
+            )
+            _auto_pre_system, _auto_pre_user = tpl_mgr.render(
+                selected_template_id,
+                content=f"지시사항: {prompt}",
+                sources="(소스 수집 후 추가됩니다)" if auto_sources else "",
+                style_reference=_ref_text,
+            )
+        _show_prompt_preview(_auto_pre_system, user_prompt=_auto_pre_user)
+
         if st.button("생성 요청", type="primary", disabled=not prompt.strip()):
             import asyncio
 
@@ -567,10 +611,6 @@ elif mode == "자동 생성":
                         style_reference=ref_text,
                     )
 
-                st.session_state["auto_last_prompt"] = {
-                    "system_prompt": auto_system_prompt,
-                    "user_prompt": auto_user_prompt,
-                }
                 client = LLMFactory.create(provider)
                 request = LLMRequest(
                     system_prompt=auto_system_prompt,
@@ -690,19 +730,14 @@ elif mode == "자동 생성":
                 system_prompt = _build_system_prompt(base_prompt, editor_content)
 
                 try:
-                    auto_messages = [
-                        {"role": m["role"], "content": m["content"]}
-                        for m in st.session_state["auto_chat_messages"]
-                    ]
-                    st.session_state["auto_last_prompt"] = {
-                        "system_prompt": system_prompt,
-                        "messages": auto_messages,
-                    }
                     client = LLMFactory.create(provider)
                     request = LLMRequest(
                         system_prompt=system_prompt,
                         user_prompt="",
-                        messages=auto_messages,
+                        messages=[
+                            {"role": m["role"], "content": m["content"]}
+                            for m in st.session_state["auto_chat_messages"]
+                        ],
                         model=model,
                     )
                     with st.spinner("LLM 응답 생성 중..."):
@@ -722,8 +757,35 @@ elif mode == "자동 생성":
 
         st.divider()
 
-        # 프롬프트 디버그
-        _show_prompt_debug("auto_last_prompt")
+        # 프롬프트 미리보기 (실시간)
+        _auto_post_base = (
+            "당신은 기술 블로그 글을 작성하는 전문 작가입니다. "
+            "주어진 주제에 대해 한국어로 기술 블로그 게시글을 작성하세요. "
+            "영어 수학/기술 용어는 그대로 유지하세요. "
+            "마크다운 형식으로 작성하되, front matter는 포함하지 마세요. "
+            "수식은 $...$ (인라인) 또는 $$...$$ (블록) 형식을 사용하세요."
+        )
+        _saved_tpl = st.session_state.get("auto_saved_template_id")
+        if _saved_tpl:
+            _auto_post_base = tpl_mgr.get(_saved_tpl).system_prompt
+        _saved_ref = st.session_state.get("auto_saved_reference_id")
+        if _saved_ref:
+            _auto_post_base += (
+                f"\n\n## 스타일 레퍼런스 예시\n\n{ref_mgr.get_content(_saved_ref)}"
+            )
+        _auto_post_editor = (
+            edited if include_current and edited and edited.strip() else None
+        )
+        _auto_post_system = _build_system_prompt(_auto_post_base, _auto_post_editor)
+        _auto_post_msgs = (
+            [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state["auto_chat_messages"]
+            ]
+            if st.session_state["auto_chat_messages"]
+            else None
+        )
+        _show_prompt_preview(_auto_post_system, messages=_auto_post_msgs)
 
         # 액션 버튼
         col_auto1, col_auto2, col_auto3, col_auto4 = st.columns([1, 1, 1, 1])
@@ -746,7 +808,6 @@ elif mode == "자동 생성":
                 st.session_state["auto_chat_messages"] = []
                 st.session_state["auto_generated_content"] = ""
                 st.session_state["auto_editor_version"] = 0
-                st.session_state.pop("auto_last_prompt", None)
                 st.rerun()
 
         @st.dialog("미리보기", width="large")
@@ -811,6 +872,5 @@ elif mode == "자동 생성":
                 "auto_saved_template_id",
                 "auto_saved_reference_id",
                 "auto_editor_version",
-                "auto_last_prompt",
             ]:
                 st.session_state.pop(key, None)
