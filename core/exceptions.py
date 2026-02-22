@@ -39,3 +39,11 @@ class GitError(PublishError):
 
 class HugoError(PublishError):
     """Hugo 명령 실행 실패."""
+
+
+class TemplateError(WhiBlogError):
+    """템플릿 관련 에러."""
+
+
+class TemplateNotFoundError(TemplateError):
+    """템플릿을 찾을 수 없음."""

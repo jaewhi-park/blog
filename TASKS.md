@@ -408,11 +408,13 @@
 
 ### M5.1 템플릿 매니저
 
-- [ ] `core/content/template_manager.py` 구현
-  - [ ] `PromptTemplate` dataclass (id, name, description, system_prompt, user_prompt_template)
-  - [ ] `list_all()`, `get()`, `create()`, `update()`, `delete()`
-  - [ ] `render()` — 플레이스홀더 치환 ({content}, {style_reference} 등)
-- [ ] 단위 테스트 (`tests/unit/test_template_manager.py`)
+- [x] `core/content/template_manager.py` 구현
+  - [x] `PromptTemplate` dataclass (id, name, description, system_prompt, user_prompt_template, created_at, updated_at)
+  - [x] `list_all()`, `get()`, `create()`, `update()`, `delete()`
+  - [x] `render()` — 플레이스홀더 치환 ({content}, {style_reference} 등), format_map + defaultdict으로 미사용 플레이스홀더 빈 문자열 처리
+- [x] `core/exceptions.py`에 `TemplateError`, `TemplateNotFoundError` 추가
+- [x] `core/content/__init__.py`에 `TemplateManager`, `PromptTemplate` export 추가
+- [x] 단위 테스트 (`tests/unit/test_template_manager.py`) — 27개 통과
 
 ### M5.2 기본 템플릿 세트
 
