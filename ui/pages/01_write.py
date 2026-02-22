@@ -80,25 +80,16 @@ def _show_prompt_preview(
     """현재 설정 기반 프롬프트 미리보기를 expander로 표시한다."""
     with st.expander("프롬프트 미리보기", expanded=False):
         st.markdown("**System Prompt**")
-        sys_preview = system_prompt
-        if len(sys_preview) > 3000:
-            sys_preview = sys_preview[:3000] + "\n\n... (truncated)"
-        st.code(sys_preview, language=None)
+        st.code(system_prompt, language=None)
         if user_prompt:
             st.markdown("**User Prompt**")
-            usr_preview = user_prompt
-            if len(usr_preview) > 3000:
-                usr_preview = usr_preview[:3000] + "\n\n... (truncated)"
-            st.code(usr_preview, language=None)
+            st.code(user_prompt, language=None)
         if messages:
             st.markdown("**Messages**")
             for msg in messages:
                 role_label = "User" if msg["role"] == "user" else "Assistant"
                 st.markdown(f"**{role_label}:**")
-                content_preview = msg["content"]
-                if len(content_preview) > 2000:
-                    content_preview = content_preview[:2000] + "\n\n... (truncated)"
-                st.code(content_preview, language=None)
+                st.code(msg["content"], language=None)
 
 
 flat_cats = _flatten_categories(cat_mgr.list_all())
