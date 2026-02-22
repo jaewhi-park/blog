@@ -28,3 +28,18 @@ theme = "hugo-book"
 [markup.goldmark.extensions.passthrough.delimiters]
   block = [["\\[", "\\]"], ["$$", "$$"]]
   inline = [["\\(", "\\)"], ["$", "$"]]
+
+[[menu.main]]
+  name = "Math"
+  url = "/math/"
+  weight = 1
+
+[[menu.main]]
+  name = "AI / ML"
+  url = "/ai/"
+  weight = 2
+
+[[menu.main]]
+  name = "Investment"
+  url = "/investment/"
+  weight = 3
