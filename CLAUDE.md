@@ -406,3 +406,40 @@ M1 (Hugo 기초) → M2 (Streamlit UI) → M3 (LLM 연동) → M4 (소스 연동
 - M2: 에이전트 1 (markdown_generator, category_manager) + 에이전트 2 (Streamlit 기본 구조) 병렬
 - M3: 에이전트 1 (LLM 클라이언트) + 에이전트 2 (LLM UI) 병렬 (인터페이스 합의 후)
 - M4: 에이전트 1 (소스 파서, 청킹) + 에이전트 2 (소스 입력 UI) 병렬
+
+---
+
+## 현재 진행 상태 (2026-02-21 기준)
+
+### 완료된 마일스톤
+
+| 마일스톤 | 상태 | 테스트 |
+|----------|------|--------|
+| M1 Hugo 사이트 기초 | Giscus 수동 설정 2건 외 완료 | — |
+| M2 Streamlit 기본 UI | 완료 | 220개 전체 통과 |
+| M3 LLM 연동 | 통합 테스트(실 API) 3건 외 완료 | — |
+| M4 소스 연동 | 완료 | — |
+
+### M1 잔여 — Giscus 수동 설정
+
+- `[ ]` GitHub Discussions 활성화 (GitHub 웹에서 수동)
+- `[ ]` Giscus 앱 설치 및 repoId/categoryId 발급 (giscus.app에서 수동)
+
+### 다음 작업: M5 템플릿 시스템
+
+착수 대상 모듈:
+- `core/content/template_manager.py` — PromptTemplate CRUD + render()
+- `core/content/reference_manager.py` — StyleReference 관리 + URL 크롤링 캐시
+- `templates/*.yaml` — 기본 템플릿 세트 5종
+- `ui/pages/03_templates.py` — 템플릿 관리 UI
+- `ui/pages/04_references.py` — 스타일 레퍼런스 관리 UI
+- 글 작성 페이지(01_write.py)에 템플릿/레퍼런스 선택 드롭다운 연동
+
+설계는 `TRD.md`의 TemplateManager, ReferenceManager 인터페이스 참조.
+
+### 구현 현황 요약
+
+- **core 모듈**: 15개 구현 완료 (llm 4 + content 4 + sources 4 + publishing 2 + pipeline 1)
+- **UI 페이지**: 7개 (01_write ~ 07_manage)
+- **UI 컴포넌트**: 6개 (editor, preview, source_input, llm_selector, image_picker, chat_panel)
+- **테스트**: 220개 전체 통과 (unit 205 + integration 15)

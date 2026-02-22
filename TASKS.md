@@ -67,10 +67,19 @@
   - [x] Hugo 설치 (extended)
   - [x] hugo --minify 빌드
   - [x] GitHub Pages 배포 (actions/deploy-pages@v4, 공식 방식으로 변경)
-- [ ] GitHub Pages 설정 *(Settings > Pages > Source: GitHub Actions 수동 설정 필요)*
-- [ ] 배포 검증 — 샘플 게시글이 정상 렌더링되는지 확인 *(push 후 수동 확인)*
+- [x] GitHub Pages 설정 *(Settings > Pages > Source: GitHub Actions 수동 설정 완료)*
+- [x] 배포 검증 — 샘플 게시글이 정상 렌더링되는지 확인 완료
 
-### M1.8 보안 설정
+### M1.8 상단 네비게이션바 + 히어로 배너
+
+- [x] `hugo.toml`에 `[[menu.main]]` 카테고리 메뉴 설정 (Math, AI/ML, Investment)
+- [x] `layouts/baseof.html` — 테마 오버라이드, sticky 네비바 추가 (브랜드, 카테고리 링크, 다크모드 토글, 모바일 햄버거)
+- [x] `layouts/index.html` — 히어로 배너 (제목, 소개, 토픽 뱃지) + 포스트 카드 그리드
+- [x] `layouts/_default/list.html` — 섹션 페이지에서 하위 전체 글을 카드 형식으로 표시 (RegularPagesRecursive)
+- [x] `layouts/_partials/docs/inject/body.html` — 다크모드 토글 버튼을 네비바로 이동, JS만 유지
+- [x] `assets/_custom.scss` — 네비바/히어로/다크모드 스타일 추가, 반응형 대응
+
+### M1.9 보안 설정
 
 - [x] `.pre-commit-config.yaml` 작성 (detect-secrets v1.5.0, ruff v0.15.2)
 - [x] `.secrets.baseline` 초기화 (PRD.md false positive 마킹 완료)
@@ -114,7 +123,8 @@
   - [x] `generate_markdown_ref()` — 마크다운 이미지 참조 생성
   - [x] `list_images()` — 게시글별 이미지 목록 조회
   - [x] `delete_image()` — 이미지 삭제 (빈 디렉토리 자동 정리)
-- [x] 단위 테스트 (`tests/unit/test_image_manager.py`) — 18개 통과
+  - [x] `remove_markdown_image_ref()` — 본문에서 이미지 마크다운 참조 제거
+- [x] 단위 테스트 (`tests/unit/test_image_manager.py`) — 33개 통과
 
 ### M2.5 글 작성 페이지 — 직접 작성 모드
 
@@ -187,6 +197,7 @@
   - [x] 미리보기 다이얼로그
   - [x] 저장 → git commit + push
   - [x] 삭제 → 확인 다이얼로그 → git commit + push
+  - [x] 이미지 관리 — 썸네일 조회, 개별 삭제(본문 참조 자동 제거 + git push), 업로드(git push)
 
 ---
 
